@@ -110,7 +110,7 @@ type Model struct {
 	searchCursor  int
 	prevFocus     focusArea // focus to restore on cancel
 
-	// Jump-to-time mode state
+	// Jump to time mode state
 	jumping   bool
 	jumpInput string
 
