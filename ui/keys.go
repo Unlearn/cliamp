@@ -61,6 +61,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		return nil
 	}
 
+	if m.jumping {
+		return m.handleJumpKey(msg)
+	}
+
 	if m.searching {
 		return m.handleSearchKey(msg)
 	}
@@ -96,6 +100,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			if m.navClient != nil {
 				m.openNavBrowser()
 			}
+		case "J":
+			m.jumping = true
+			m.jumpInput = ""
+			m.jumpErr = ""
 		}
 		return nil
 	}
@@ -269,6 +277,11 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		m.prevFocus = m.focus
 		m.focus = focusSearch
 
+	case "J":
+		m.jumping = true
+		m.jumpInput = ""
+		m.jumpErr = ""
+
 	case "p":
 		if m.localProvider != nil {
 			m.openPlaylistManager()
@@ -393,6 +406,59 @@ func copyFile(src, dst string) error {
 	if closeErr != nil {
 		os.Remove(dst)
 		return closeErr
+	}
+	return nil
+}
+
+// handleJumpKey processes key presses while in jump-time mode.
+func (m *Model) handleJumpKey(msg tea.KeyMsg) tea.Cmd {
+	switch msg.String() {
+	case "ctrl+c":
+		m.jumping = false
+		m.player.Close()
+		m.quitting = true
+		return tea.Quit
+	case "ctrl+k":
+		m.showKeymap = true
+		return nil
+	}
+
+	switch msg.Type {
+	case tea.KeyEscape:
+		m.jumping = false
+		m.jumpInput = ""
+		m.jumpErr = ""
+		return nil
+	case tea.KeyEnter:
+		target, err := parseJumpTarget(m.jumpInput)
+		if err != nil {
+			m.jumpErr = err.Error()
+			return nil
+		}
+		m.player.Seek(target - m.player.Position())
+		m.notifyMPRIS()
+		if m.mpris != nil {
+			m.mpris.EmitSeeked(m.player.Position().Microseconds())
+		}
+		m.jumping = false
+		m.jumpInput = ""
+		m.jumpErr = ""
+		return nil
+	case tea.KeyBackspace:
+		if len(m.jumpInput) > 0 {
+			_, size := utf8.DecodeLastRuneInString(m.jumpInput)
+			m.jumpInput = m.jumpInput[:len(m.jumpInput)-size]
+			m.jumpErr = ""
+		}
+		return nil
+	case tea.KeySpace:
+		// Ignore spaces to keep the input format strict and fast.
+		return nil
+	}
+
+	if msg.Type == tea.KeyRunes {
+		m.jumpInput += string(msg.Runes)
+		m.jumpErr = ""
 	}
 	return nil
 }
@@ -749,6 +815,7 @@ var keymapEntries = []keymapEntry{
 	{"A", "Queue manager"},
 	{"o", "Open file browser"},
 	{"N", "Navidrome browser"},
+	{"J", "Jump to time"},
 	{"p", "Playlist manager"},
 	{"i", "Track info / metadata"},
 	{"S", "Save track to ~/Music"},

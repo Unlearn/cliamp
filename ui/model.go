@@ -111,6 +111,11 @@ type Model struct {
 	searchCursor  int
 	prevFocus     focusArea // focus to restore on cancel
 
+	// Jump-to-time mode state (Shift+J)
+	jumping   bool
+	jumpInput string
+	jumpErr   string
+
 	// Async feed/M3U URL resolution
 	pendingURLs []string
 	feedLoading bool
@@ -281,7 +286,7 @@ func (m Model) ThemeName() string {
 func (m *Model) isOverlayActive() bool {
 	return m.showKeymap || m.showThemes || m.showFileBrowser ||
 		m.showNavBrowser || m.showPlManager || m.showQueue ||
-		m.showInfo || m.searching
+		m.showInfo || m.searching || m.jumping
 }
 
 // openThemePicker re-loads themes from disk (picking up new user files)

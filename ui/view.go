@@ -56,6 +56,10 @@ func (m Model) View() string {
 		return m.renderSearchOverlay()
 	}
 
+	if m.jumping {
+		return m.renderJumpOverlay()
+	}
+
 	if m.fullVis {
 		return m.renderFullVisualizer()
 	}
@@ -824,6 +828,29 @@ func (m Model) renderSearchOverlay() string {
 	lines = append(lines, "", dimStyle.Render(fmt.Sprintf("  %d found", len(m.searchResults))))
 	lines = append(lines, "", helpKey("↑↓", "Navigate ")+helpKey("Enter", "Play ")+helpKey("Tab", "Queue ")+helpKey("Ctrl+K", "Keymap ")+helpKey("Esc", "Close"))
 
+	return m.centerOverlay(strings.Join(lines, "\n"))
+}
+
+func (m Model) renderJumpOverlay() string {
+	pos := m.player.Position()
+	dur := m.player.Duration()
+	timeLine := fmt.Sprintf("%s / %s", formatJumpClock(pos), formatJumpClock(dur))
+
+	lines := []string{
+		titleStyle.Render("J U M P  T O  T I M E"),
+		"",
+		dimStyle.Render("  " + timeLine),
+		"",
+		playlistSelectedStyle.Render("  " + m.jumpInput + "_"),
+		"",
+		dimStyle.Render("  Enter 10, 58:, 58:6, or 58:05"),
+	}
+
+	if m.jumpErr != "" {
+		lines = append(lines, "", errorStyle.Render("  "+m.jumpErr))
+	}
+
+	lines = append(lines, "", helpKey("Enter", "Jump ")+helpKey("Esc", "Cancel"))
 	return m.centerOverlay(strings.Join(lines, "\n"))
 }
 
