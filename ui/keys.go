@@ -101,8 +101,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 				m.openNavBrowser()
 			}
 		case "J":
-			m.jumping = true
-			m.jumpInput = ""
+			m.openJumpMode()
 		}
 		return nil
 	}
@@ -277,8 +276,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		m.focus = focusSearch
 
 	case "J":
-		m.jumping = true
-		m.jumpInput = ""
+		m.openJumpMode()
 
 	case "p":
 		if m.localProvider != nil {
@@ -410,6 +408,11 @@ func copyFile(src, dst string) error {
 
 func (m *Model) resetJumpInput() {
 	m.jumpInput = ""
+}
+
+func (m *Model) openJumpMode() {
+	m.jumping = true
+	m.resetJumpInput()
 }
 
 func (m *Model) closeJumpMode() {
