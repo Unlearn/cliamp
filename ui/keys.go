@@ -428,9 +428,6 @@ func (m *Model) handleJumpKey(msg tea.KeyMsg) tea.Cmd {
 		m.player.Close()
 		m.quitting = true
 		return tea.Quit
-	case "ctrl+k":
-		m.showKeymap = true
-		return nil
 	}
 
 	switch msg.Type {
@@ -459,9 +456,6 @@ func (m *Model) handleJumpKey(msg tea.KeyMsg) tea.Cmd {
 			_, size := utf8.DecodeLastRuneInString(m.jumpInput)
 			m.jumpInput = m.jumpInput[:len(m.jumpInput)-size]
 		}
-		return nil
-	case tea.KeySpace:
-		// Ignore spaces to keep the input format strict and fast.
 		return nil
 	}
 
