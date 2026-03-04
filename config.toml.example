@@ -14,7 +14,7 @@ shuffle = false
 mono = false
 
 # Shift+Left/Right seek jump in seconds (1-600)
-seek_step_large_sec = 30
+seek_large_step_sec = 30
 
 # Output sample rate in Hz (22050, 44100, 48000, 96000, 192000)
 # Higher values preserve more detail from hi-res files but use more CPU

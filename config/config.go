@@ -144,7 +144,7 @@ func Load() (Config, error) {
 				cfg.Shuffle = val == "true"
 			case "mono":
 				cfg.Mono = val == "true"
-			case "seek_step_large_sec":
+			case "seek_large_step_sec":
 				if v, err := strconv.Atoi(val); err == nil {
 					cfg.SeekStepLarge = v
 				}

@@ -181,7 +181,7 @@ shuffle = false
 mono = false
 
 # Shift+Left/Right seek jump in seconds
-seek_step_large_sec = 30
+seek_large_step_sec = 30
 
 # EQ preset: "Flat", "Rock", "Pop", "Jazz", "Classical",
 #             "Bass Boost", "Treble Boost", "Vocal", "Electronic", "Acoustic"
