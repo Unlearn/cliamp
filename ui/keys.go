@@ -144,6 +144,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			}
 		}
 
+	case "shift+left":
+		m.player.Seek(-m.seekStepLarge)
+		if m.mpris != nil {
+			m.mpris.EmitSeeked(m.player.Position().Microseconds())
+		}
+
 	case "right":
 		if m.focus == focusEQ {
 			if m.eqCursor < numBands-1 {
@@ -154,6 +160,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			if m.mpris != nil {
 				m.mpris.EmitSeeked(m.player.Position().Microseconds())
 			}
+		}
+
+	case "shift+right":
+		m.player.Seek(m.seekStepLarge)
+		if m.mpris != nil {
+			m.mpris.EmitSeeked(m.player.Position().Microseconds())
 		}
 
 	case "up", "k":
@@ -723,6 +735,7 @@ var keymapEntries = []keymapEntry{
 	{"> .", "Next track"},
 	{"< ,", "Previous track"},
 	{"← →", "Seek ±5s"},
+	{"Shift+← →", "Seek ±large step"},
 	{"+ -", "Volume up/down"},
 	{"m", "Toggle mono"},
 	{"e", "Cycle EQ preset"},
