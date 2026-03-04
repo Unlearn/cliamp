@@ -114,7 +114,6 @@ type Model struct {
 	// Jump-to-time mode state (Shift+J)
 	jumping   bool
 	jumpInput string
-	jumpErr   string
 
 	// Async feed/M3U URL resolution
 	pendingURLs []string

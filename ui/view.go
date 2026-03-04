@@ -835,19 +835,17 @@ func (m Model) renderJumpOverlay() string {
 	pos := m.player.Position()
 	dur := m.player.Duration()
 	timeLine := fmt.Sprintf("%s / %s", formatJumpClock(pos), formatJumpClock(dur))
+	inputLine := dimStyle.Faint(true).Render("  00:00")
+	if m.jumpInput != "" {
+		inputLine = playlistSelectedStyle.Render("  " + m.jumpInput + "_")
+	}
 
 	lines := []string{
 		titleStyle.Render("J U M P  T O  T I M E"),
 		"",
 		dimStyle.Render("  " + timeLine),
 		"",
-		playlistSelectedStyle.Render("  " + m.jumpInput + "_"),
-		"",
-		dimStyle.Render("  Enter 10, 58:, 58:6, or 58:05"),
-	}
-
-	if m.jumpErr != "" {
-		lines = append(lines, "", errorStyle.Render("  "+m.jumpErr))
+		inputLine,
 	}
 
 	lines = append(lines, "", helpKey("Enter", "Jump ")+helpKey("Esc", "Cancel"))

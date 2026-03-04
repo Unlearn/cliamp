@@ -103,7 +103,6 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		case "J":
 			m.jumping = true
 			m.jumpInput = ""
-			m.jumpErr = ""
 		}
 		return nil
 	}
@@ -280,7 +279,6 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 	case "J":
 		m.jumping = true
 		m.jumpInput = ""
-		m.jumpErr = ""
 
 	case "p":
 		if m.localProvider != nil {
@@ -410,11 +408,20 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
+func (m *Model) resetJumpInput() {
+	m.jumpInput = ""
+}
+
+func (m *Model) closeJumpMode() {
+	m.jumping = false
+	m.resetJumpInput()
+}
+
 // handleJumpKey processes key presses while in jump-time mode.
 func (m *Model) handleJumpKey(msg tea.KeyMsg) tea.Cmd {
 	switch msg.String() {
 	case "ctrl+c":
-		m.jumping = false
+		m.closeJumpMode()
 		m.player.Close()
 		m.quitting = true
 		return tea.Quit
@@ -425,14 +432,16 @@ func (m *Model) handleJumpKey(msg tea.KeyMsg) tea.Cmd {
 
 	switch msg.Type {
 	case tea.KeyEscape:
-		m.jumping = false
-		m.jumpInput = ""
-		m.jumpErr = ""
+		m.closeJumpMode()
 		return nil
 	case tea.KeyEnter:
 		target, err := parseJumpTarget(m.jumpInput)
 		if err != nil {
-			m.jumpErr = err.Error()
+			m.resetJumpInput()
+			return nil
+		}
+		if dur := m.player.Duration(); dur > 0 && target > dur {
+			m.resetJumpInput()
 			return nil
 		}
 		m.player.Seek(target - m.player.Position())
@@ -440,15 +449,12 @@ func (m *Model) handleJumpKey(msg tea.KeyMsg) tea.Cmd {
 		if m.mpris != nil {
 			m.mpris.EmitSeeked(m.player.Position().Microseconds())
 		}
-		m.jumping = false
-		m.jumpInput = ""
-		m.jumpErr = ""
+		m.closeJumpMode()
 		return nil
 	case tea.KeyBackspace:
 		if len(m.jumpInput) > 0 {
 			_, size := utf8.DecodeLastRuneInString(m.jumpInput)
 			m.jumpInput = m.jumpInput[:len(m.jumpInput)-size]
-			m.jumpErr = ""
 		}
 		return nil
 	case tea.KeySpace:
@@ -458,7 +464,6 @@ func (m *Model) handleJumpKey(msg tea.KeyMsg) tea.Cmd {
 
 	if msg.Type == tea.KeyRunes {
 		m.jumpInput += string(msg.Runes)
-		m.jumpErr = ""
 	}
 	return nil
 }
