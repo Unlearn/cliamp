@@ -354,7 +354,7 @@ func (c Config) SeekStepLargeDuration() time.Duration {
 // clamp constrains all Config fields to their valid ranges.
 func (c *Config) clamp() {
 	c.Volume = max(min(c.Volume, 6), -30)
-	c.SeekStepLarge = max(min(c.SeekStepLarge, 600), 1)
+	c.SeekStepLarge = max(min(c.SeekStepLarge, 600), 6)
 	c.SampleRate = clampSampleRate(c.SampleRate)
 	c.BufferMs = max(min(c.BufferMs, 500), 50)
 	c.ResampleQuality = max(min(c.ResampleQuality, 4), 1)

@@ -234,10 +234,14 @@ func (m *Model) SetAutoPlay(v bool) { m.autoPlay = v }
 
 // SetSeekStepLarge configures the Shift+Left/Right seek jump amount.
 func (m *Model) SetSeekStepLarge(d time.Duration) {
-	if d <= 0 {
-		d = 30 * time.Second
+	switch {
+	case d <= 0:
+		m.seekStepLarge = 30 * time.Second
+	case d <= 5*time.Second:
+		m.seekStepLarge = 6 * time.Second
+	default:
+		m.seekStepLarge = d
 	}
-	m.seekStepLarge = d
 }
 
 // SetTheme finds a theme by name and applies it. Returns true if found.

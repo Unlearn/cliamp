@@ -13,7 +13,7 @@ shuffle = false
 # Start with mono output (L+R downmix)
 mono = false
 
-# Shift+Left/Right seek jump in seconds (1-600)
+# Shift+Left/Right seek jump in seconds (6-600)
 seek_large_step_sec = 30
 
 # Output sample rate in Hz (22050, 44100, 48000, 96000, 192000)
