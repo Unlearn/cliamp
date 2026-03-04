@@ -241,6 +241,7 @@ Flags can appear before, after, or between file arguments. See [docs/cli.md](doc
 | `V` | Full-screen visualizer |
 | `S` | Save track to ~/Music |
 | `/` | Search playlist |
+| `Shift+J` | Jump-to-time modal (`10`, `58:`, `58:6`, `58:05`) |
 | `x` | Expand/collapse playlist |
 | `o` | Open file browser |
 | `N` | Navidrome browser |
