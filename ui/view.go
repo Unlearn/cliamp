@@ -454,7 +454,7 @@ func (m Model) renderJumpOverlay() string {
 	pos := m.player.Position()
 	dur := m.player.Duration()
 	timeLine := fmt.Sprintf("%s / %s", formatJumpClock(pos), formatJumpClock(dur))
-	inputLine := dimStyle.Faint(true).Render("  00:00")
+	inputLine := dimStyle.Faint(true).Render("  " + formatJumpPlaceholder(dur))
 	if m.jumpInput != "" {
 		inputLine = playlistSelectedStyle.Render("  " + m.jumpInput + "_")
 	}
