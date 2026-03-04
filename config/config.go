@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // configPath returns the path to the config file.
@@ -343,6 +344,11 @@ func (c Config) ApplyPlaylist(pl PlaylistConfig) {
 	if c.Shuffle {
 		pl.ToggleShuffle()
 	}
+}
+
+// SeekStepLargeDuration returns the configured Shift+Left/Right seek jump.
+func (c Config) SeekStepLargeDuration() time.Duration {
+	return time.Duration(c.SeekStepLarge) * time.Second
 }
 
 // clamp constrains all Config fields to their valid ranges.
