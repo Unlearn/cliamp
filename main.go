@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -95,7 +94,7 @@ func run(overrides config.Overrides, positional []string) error {
 	themes := theme.LoadAll()
 
 	m := ui.NewModel(p, pl, provider, localProv, themes, cfg.Navidrome, navClient)
-	m.SetSeekStepLarge(time.Duration(cfg.SeekStepLarge) * time.Second)
+	m.SetSeekStepLarge(cfg.SeekStepLargeDuration())
 	m.SetPendingURLs(resolved.Pending)
 	if len(resolved.Tracks) == 0 && len(resolved.Pending) == 0 {
 		m.StartInProvider()
