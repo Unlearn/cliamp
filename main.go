@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -53,6 +54,14 @@ func run(overrides config.Overrides, positional []string) error {
 
 	defer resolve.CleanupYTDL()
 
+	if len(positional) > 0 && positional[0] == "search" {
+		if len(positional) == 1 {
+			return fmt.Errorf("search requires a query string (e.g. cliamp search \"never gonna give you up\")")
+		}
+		query := strings.Join(positional[1:], " ")
+		positional = []string{"ytsearch1:" + query}
+	}
+
 	resolved, err := resolve.Args(positional)
 	if err != nil {
 		return err
@@ -62,7 +71,7 @@ func run(overrides config.Overrides, positional []string) error {
 	// in which case we open the provider browser instead).
 	defaultRadio := len(positional) == 0 && navProv == nil
 	if defaultRadio {
-		resolved.Pending = append(resolved.Pending, "http://cliamp.stream/public/iamdothash/playlist.pls")
+		resolved.Pending = append(resolved.Pending, "https://radio.cliamp.stream/lofi/stream.pls")
 	}
 
 	pl := playlist.New()
@@ -162,6 +171,7 @@ Examples:
   cliamp --eq-preset "Bass Boost" ~/Music
   cliamp https://example.com/song.mp3
   cliamp http://radio.example.com/stream.m3u
+  cliamp search "rick astley"
   cliamp https://soundcloud.com/user/sets/playlist
   cliamp https://www.youtube.com/watch?v=...
 

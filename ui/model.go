@@ -25,6 +25,7 @@ const (
 	focusEQ
 	focusSearch
 	focusProvider
+	focusNetSearch
 )
 
 type plMgrScreenType int
@@ -113,6 +114,10 @@ type Model struct {
 	// Jump to time mode state
 	jumping   bool
 	jumpInput string
+  
+	// Dynamic internet search
+	netSearching   bool
+	netSearchQuery string
 
 	// Async feed/M3U URL resolution
 	pendingURLs []string
@@ -180,24 +185,25 @@ type Model struct {
 	fbErr           string
 
 	// Navidrome explore browser overlay
-	showNavBrowser  bool
-	navClient       *navidrome.NavidromeClient // nil when Navidrome is not configured
-	navMode         navBrowseModeType
-	navScreen       navBrowseScreenType
-	navCursor       int
-	navScroll       int
-	navArtists      []navidrome.Artist
-	navAlbums       []navidrome.Album
-	navTracks       []playlist.Track
-	navSelArtist    navidrome.Artist
-	navSelAlbum     navidrome.Album
-	navSortType     string // current album sort type, persisted to config
-	navAlbumLoading bool   // true while an album page fetch is in progress
-	navAlbumDone    bool   // true once the server signals no more pages (isLast)
-	navLoading      bool   // general loading flag for artists/tracks
-	navSearching    bool   // true while the nav search bar is open
-	navSearch       string // current nav search query
-	navSearchIdx    []int  // filtered indices into the active list (nil = no filter)
+	showNavBrowser     bool
+	navClient          *navidrome.NavidromeClient // nil when Navidrome is not configured
+	navScrobbleEnabled bool                       // mirrors NavidromeConfig.ScrobbleEnabled(); set at init
+	navMode            navBrowseModeType
+	navScreen          navBrowseScreenType
+	navCursor          int
+	navScroll          int
+	navArtists         []navidrome.Artist
+	navAlbums          []navidrome.Album
+	navTracks          []playlist.Track
+	navSelArtist       navidrome.Artist
+	navSelAlbum        navidrome.Album
+	navSortType        string // current album sort type, persisted to config
+	navAlbumLoading    bool   // true while an album page fetch is in progress
+	navAlbumDone       bool   // true once the server signals no more pages (isLast)
+	navLoading         bool   // general loading flag for artists/tracks
+	navSearching       bool   // true while the nav search bar is open
+	navSearch          string // current nav search query
+	navSearchIdx       []int  // filtered indices into the active list (nil = no filter)
 }
 
 // NewModel creates a Model wired to the given player and playlist.
@@ -211,17 +217,18 @@ func NewModel(p *player.Player, pl *playlist.Playlist, prov playlist.Provider, l
 		sortType = navidrome.SortAlphabeticalByName
 	}
 	m := Model{
-		player:        p,
-		playlist:      pl,
-		vis:           NewVisualizer(float64(p.SampleRate())),
-		seekStepLarge: 30 * time.Second,
-		plVisible:     5,
-		eqPresetIdx:   -1, // custom until a preset is selected
-		themes:        themes,
-		themeIdx:      -1, // Default (ANSI)
-		localProvider: localProv,
-		navSortType:   sortType,
-		navClient:     nav,
+		player:             p,
+		playlist:           pl,
+		vis:                NewVisualizer(float64(p.SampleRate())),
+		plVisible:          5,
+		eqPresetIdx:        -1, // custom until a preset is selected
+		themes:             themes,
+		themeIdx:           -1, // Default (ANSI)
+		localProvider:      localProv,
+		navSortType:        sortType,
+		navClient:          nav,
+		navScrobbleEnabled: navCfg.ScrobbleEnabled(),
+    seekStepLarge: 30 * time.Second,
 	}
 	if prov != nil {
 		m.provider = prov
@@ -288,7 +295,7 @@ func (m Model) ThemeName() string {
 func (m *Model) isOverlayActive() bool {
 	return m.showKeymap || m.showThemes || m.showFileBrowser ||
 		m.showNavBrowser || m.showPlManager || m.showQueue ||
-		m.showInfo || m.searching || m.jumping
+		m.showInfo || m.searching || m.netSearching || m.jumping
 }
 
 // openThemePicker re-loads themes from disk (picking up new user files)
@@ -445,6 +452,19 @@ func resolveRemoteCmd(urls []string) tea.Cmd {
 	}
 }
 
+// netSearchLoadedMsg carries tracks dynamically searched from the internet.
+type netSearchLoadedMsg []playlist.Track
+
+func fetchNetSearchCmd(query string) tea.Cmd {
+	return func() tea.Msg {
+		tracks, err := resolve.Remote([]string{query})
+		if err != nil {
+			return err
+		}
+		return netSearchLoadedMsg(tracks)
+	}
+}
+
 // streamPlayedMsg signals that async stream Play() completed.
 type streamPlayedMsg struct{ err error }
 
@@ -475,6 +495,32 @@ func preloadStreamCmd(p *player.Player, path string, knownDuration time.Duration
 	return func() tea.Msg {
 		p.Preload(path, knownDuration) // errors silently ignored
 		return streamPreloadedMsg{}
+	}
+}
+
+func playYTDLStreamCmd(p *player.Player, pageURL string, knownDuration time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		return streamPlayedMsg{err: p.PlayYTDL(pageURL, knownDuration)}
+	}
+}
+
+func preloadYTDLStreamCmd(p *player.Player, pageURL string, knownDuration time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		p.PreloadYTDL(pageURL, knownDuration) // errors silently ignored
+		return streamPreloadedMsg{}
+	}
+}
+
+// ytdlSavedMsg signals that an async yt-dlp download-to-disk completed.
+type ytdlSavedMsg struct {
+	path string
+	err  error
+}
+
+func saveYTDLCmd(pageURL string, saveDir string) tea.Cmd {
+	return func() tea.Msg {
+		path, err := resolve.DownloadYTDL(pageURL, saveDir)
+		return ytdlSavedMsg{path: path, err: err}
 	}
 }
 
@@ -734,6 +780,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmds []tea.Cmd
 		// Check gapless transition (audio already playing next track)
 		if m.player.GaplessAdvanced() {
+			// Capture the track that just finished before advancing the playlist.
+			// For gapless, the track played fully (100% ≥ 50%), so elapsed = duration.
+			finishedTrack, _ := m.playlist.Current()
+			fullDur := time.Duration(finishedTrack.DurationSecs) * time.Second
+			m.maybeScrobble(finishedTrack, fullDur, fullDur)
+
 			m.playlist.Next()
 			m.plCursor = m.playlist.Index()
 			m.adjustScroll()
@@ -753,6 +805,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Skip if already buffering a yt-dlp download to avoid advancing
 		// the playlist on every tick while waiting for the resolve.
 		if m.player.IsPlaying() && !m.player.IsPaused() && m.player.Drained() && !m.buffering {
+			// Track drained to end — always ≥ 50%.
+			finishedTrack, _ := m.playlist.Current()
+			drainDur := time.Duration(finishedTrack.DurationSecs) * time.Second
+			m.maybeScrobble(finishedTrack, drainDur, drainDur)
+
 			cmds = append(cmds, m.nextTrack())
 			m.notifyMPRIS()
 		}
@@ -847,6 +904,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case netSearchLoadedMsg:
+		if len(msg) > 0 {
+			startIdx := m.playlist.Len()
+			m.playlist.Add(msg...)
+			for i := startIdx; i < m.playlist.Len(); i++ {
+				m.playlist.Queue(i)
+			}
+			m.saveMsg = fmt.Sprintf("Added to Queue: %s", msg[0].DisplayName())
+			m.saveMsgTTL = 60
+			if !m.player.IsPlaying() {
+				cmd := m.playCurrentTrack()
+				m.notifyMPRIS()
+				return m, cmd
+			}
+		} else {
+			m.saveMsg = "No tracks found online."
+			m.saveMsgTTL = 60
+		}
+		return m, nil
+
 	case fbTracksResolvedMsg:
 		if len(msg.tracks) == 0 {
 			m.saveMsg = "No audio files found"
@@ -889,6 +966,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.preloading = false
 		return m, nil
 
+	case ytdlSavedMsg:
+		if msg.err != nil {
+			m.saveMsg = fmt.Sprintf("Download failed: %s", msg.err)
+		} else {
+			m.saveMsg = fmt.Sprintf("Saved to %s", msg.path)
+		}
+		m.saveMsgTTL = 80
+		return m, nil
+
 	case ytdlResolvedMsg:
 		m.buffering = false
 		if msg.err != nil {
@@ -919,11 +1005,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case mpris.NextMsg:
+		if track, _ := m.playlist.Current(); track.NavidromeID != "" {
+			m.maybeScrobble(track, m.player.Position(), m.player.Duration())
+		}
 		cmd := m.nextTrack()
 		m.notifyMPRIS()
 		return m, cmd
 
 	case mpris.PrevMsg:
+		if track, _ := m.playlist.Current(); track.NavidromeID != "" {
+			m.maybeScrobble(track, m.player.Position(), m.player.Duration())
+		}
 		cmd := m.prevTrack()
 		m.notifyMPRIS()
 		return m, cmd
@@ -1013,16 +1105,18 @@ func (m *Model) playCurrentTrack() tea.Cmd {
 }
 
 // playTrack plays a track, using async HTTP for streams and sync I/O for local files.
-// yt-dlp URLs are lazily resolved to direct audio streams before playback.
+// yt-dlp URLs are streamed via a piped yt-dlp | ffmpeg chain for instant playback.
 func (m *Model) playTrack(track playlist.Track) tea.Cmd {
 	m.streamTitle = ""
-	// Lazy-resolve yt-dlp URLs (SoundCloud, YouTube, etc.) to direct audio streams.
+	// Stream yt-dlp URLs (SoundCloud, YouTube, etc.) via pipe chain.
 	if playlist.IsYTDL(track.Path) {
 		m.buffering = true
 		m.err = nil
-		_, idx := m.playlist.Current()
-		return resolveYTDLCmd(idx, track.Path)
+		dur := time.Duration(track.DurationSecs) * time.Second
+		return playYTDLStreamCmd(m.player, track.Path, dur)
 	}
+	// Fire now-playing notification for Navidrome tracks.
+	m.nowPlaying(track)
 	dur := time.Duration(track.DurationSecs) * time.Second
 	if track.Stream {
 		m.buffering = true
@@ -1053,9 +1147,18 @@ func (m *Model) preloadNext() tea.Cmd {
 	if !ok {
 		return nil
 	}
-	// Can't preload yt-dlp tracks — they need lazy resolution first.
+	// Preload yt-dlp tracks with the same lead-time deferral as HTTP streams.
 	if playlist.IsYTDL(next.Path) {
-		return nil
+		dur := m.player.Duration()
+		if dur > 0 {
+			remaining := dur - m.player.Position()
+			if remaining > streamPreloadLeadTime {
+				return nil
+			}
+		}
+		nextDur := time.Duration(next.DurationSecs) * time.Second
+		m.preloading = true
+		return preloadYTDLStreamCmd(m.player, next.Path, nextDur)
 	}
 	if next.Stream {
 		// For streams, only arm gapless if we're within the lead-time window.
@@ -1162,4 +1265,41 @@ func (m *Model) updateSearch() {
 			m.searchResults = append(m.searchResults, i)
 		}
 	}
+}
+
+// maybeScrobble fires a submission scrobble for the given track if all
+// conditions are met:
+//   - navClient is configured
+//   - scrobbling is enabled in config
+//   - the track has a NavidromeID (i.e. it came from Navidrome)
+//   - elapsed is at least 50% of the track's known duration
+//
+// The call is dispatched in a goroutine so it never blocks the UI.
+func (m *Model) maybeScrobble(track playlist.Track, elapsed, duration time.Duration) {
+	if m.navClient == nil || !m.navScrobbleEnabled {
+		return
+	}
+	if track.NavidromeID == "" {
+		return
+	}
+	if duration <= 0 {
+		// Unknown duration: use DurationSecs metadata as fallback.
+		duration = time.Duration(track.DurationSecs) * time.Second
+	}
+	if duration <= 0 {
+		return // still unknown — skip
+	}
+	if elapsed < duration/2 {
+		return // less than 50% played
+	}
+	id := track.NavidromeID
+	go m.navClient.Scrobble(id, true)
+}
+
+// nowPlaying fires a now-playing notification for the given track if configured.
+func (m *Model) nowPlaying(track playlist.Track) {
+	if m.navClient == nil || !m.navScrobbleEnabled || track.NavidromeID == "" {
+		return
+	}
+	go m.navClient.Scrobble(track.NavidromeID, false)
 }

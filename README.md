@@ -6,7 +6,7 @@ Built with [Bubbletea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](
 
 Listen to our radio channel:
 ```bash
-cliamp http://cliamp.stream/public/iamdothash/playlist.pls
+cliamp https://radio.cliamp.stream/lofi/stream.pls
 ```
 
 
@@ -123,6 +123,12 @@ Play from YouTube, SoundCloud, and Bandcamp URLs if [yt-dlp](https://github.com/
 Playlists and albums are supported. Press `S` to save a downloaded track to `~/Music/cliamp/`.
 
 **Use at your own risk.** Downloading or streaming copyrighted content may violate the terms of service of these platforms. You are responsible for how you use this feature.
+
+## Create Your Own Radio Station
+
+Run your own internet radio with [cliamp-server](https://github.com/bjarneo/cliamp-server) — point it at a directory of audio files and it starts broadcasting:
+
+Supports multiple stations, live metadata, on-the-fly transcoding. See the [cliamp-server README](https://github.com/bjarneo/cliamp-server) for the full setup guide.
 
 ## Navidrome
 
