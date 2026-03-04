@@ -116,7 +116,7 @@ type Model struct {
 	netSearching   bool
 	netSearchQuery string
 
-	// Jump-to-time mode state (Shift+J)
+	// Jump-to-time mode state
 	jumping   bool
 	jumpInput string
 

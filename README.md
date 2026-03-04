@@ -228,7 +228,7 @@ Flags can appear before, after, or between file arguments. See [docs/cli.md](doc
 | `>` `.` | Next track |
 | `<` `,` | Previous track |
 | `Left` `Right` | Seek -/+5s |
-| `Shift+Left` `Shift+Right` | Seek +/- large step (default 30s, configurable) |
+| `Shift+Left` `Shift+Right` | Seek -/+30s (configurable) |
 | `+` `-` | Volume up/down |
 | `m` | Toggle mono |
 | `Tab` | Toggle focus (Playlist / EQ) |
@@ -241,7 +241,7 @@ Flags can appear before, after, or between file arguments. See [docs/cli.md](doc
 | `V` | Full-screen visualizer |
 | `S` | Save track to ~/Music |
 | `/` | Search playlist |
-| `Shift+J` | Jump-to-time modal (`10`, `58:`, `58:6`, `58:05`) |
+| `J` | Jump to time |
 | `x` | Expand/collapse playlist |
 | `o` | Open file browser |
 | `N` | Navidrome browser |

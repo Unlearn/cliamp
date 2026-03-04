@@ -7,13 +7,7 @@ import (
 	"time"
 )
 
-// parseJumpTarget parses an absolute jump target from track start.
-//
-// Accepted formats:
-// - "10"      => 10s
-// - "58:05"   => 58m05s
-// - "58:5"    => 58m05s
-// - "58:"     => 58m00s
+// parseJumpTarget parses an absolute jump target from track start
 func parseJumpTarget(raw string) (time.Duration, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
