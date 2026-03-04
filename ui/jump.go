@@ -7,41 +7,65 @@ import (
 	"time"
 )
 
-// parseJumpTarget parses an absolute jump target from track start
+// parseJumpTarget parses an absolute jump target from track start.
+//
+// Accepted formats:
+// - "10"       => 10s
+// - "58:05"    => 58m05s
+// - "1:02:03"  => 1h02m03s
 func parseJumpTarget(raw string) (time.Duration, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
-		return 0, fmt.Errorf("enter time like 10 or 58:05")
+		return 0, fmt.Errorf("use ss, mm:ss, or hh:mm:ss format")
 	}
 
-	minPart, secPart, hasSep := strings.Cut(s, ":")
-	if !hasSep {
-		secs, err := parseWholeSeconds(minPart)
+	parts := strings.Split(s, ":")
+	switch len(parts) {
+	case 1:
+		secs, err := parseTotalSeconds(parts[0])
 		if err != nil {
 			return 0, err
 		}
 		return time.Duration(secs) * time.Second, nil
-	}
-	if strings.Contains(secPart, ":") {
-		return 0, fmt.Errorf("use mm:ss format")
-	}
+	case 2:
+		minPart := normalizeClockField(parts[0])
+		secPart := normalizeClockField(parts[1])
 
-	minPart = normalizeClockPart(minPart)
-	secPart = normalizeClockPart(secPart)
+		mins, err := parseTotalMinutes(minPart)
+		if err != nil {
+			return 0, err
+		}
+		secs, err := parseClockSeconds(secPart)
+		if err != nil {
+			return 0, err
+		}
+		return time.Duration(mins)*time.Minute + time.Duration(secs)*time.Second, nil
+	case 3:
+		hourPart := normalizeClockField(parts[0])
+		minPart := normalizeClockField(parts[1])
+		secPart := normalizeClockField(parts[2])
 
-	mins, err := parseMinutesPart(minPart)
-	if err != nil {
-		return 0, err
+		hours, err := parseTotalHours(hourPart)
+		if err != nil {
+			return 0, err
+		}
+		mins, err := parseClockMinutes(minPart)
+		if err != nil {
+			return 0, err
+		}
+		secs, err := parseClockSeconds(secPart)
+		if err != nil {
+			return 0, err
+		}
+		return time.Duration(hours)*time.Hour +
+			time.Duration(mins)*time.Minute +
+			time.Duration(secs)*time.Second, nil
+	default:
+		return 0, fmt.Errorf("use ss, mm:ss, or hh:mm:ss format")
 	}
-	secs, err := parseSecondsPart(secPart)
-	if err != nil {
-		return 0, err
-	}
-
-	return time.Duration(mins)*time.Minute + time.Duration(secs)*time.Second, nil
 }
 
-func normalizeClockPart(s string) string {
+func normalizeClockField(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "0"
@@ -49,28 +73,51 @@ func normalizeClockPart(s string) string {
 	return s
 }
 
-func parseWholeSeconds(s string) (int, error) {
-	secs, err := parsePositiveInt(strings.TrimSpace(s), "seconds")
+func parseTotalSeconds(s string) (int, error) {
+	secs, err := parseNonNegativeInt(strings.TrimSpace(s), "seconds")
 	if err != nil {
 		return 0, err
 	}
 	return secs, nil
 }
 
-func parseMinutesPart(s string) (int, error) {
-	mins, err := parsePositiveInt(s, "minutes")
+func parseTotalMinutes(s string) (int, error) {
+	mins, err := parseNonNegativeInt(s, "minutes")
 	if err != nil {
 		return 0, err
 	}
 	return mins, nil
 }
 
-func parseSecondsPart(s string) (int, error) {
+func parseTotalHours(s string) (int, error) {
+	hours, err := parseNonNegativeInt(s, "hours")
+	if err != nil {
+		return 0, err
+	}
+	return hours, nil
+}
+
+func parseClockMinutes(s string) (int, error) {
+	if len(s) > 2 {
+		return 0, fmt.Errorf("minutes must be 0-59")
+	}
+
+	mins, err := parseNonNegativeInt(s, "minutes")
+	if err != nil {
+		return 0, err
+	}
+	if mins > 59 {
+		return 0, fmt.Errorf("minutes must be 0-59")
+	}
+	return mins, nil
+}
+
+func parseClockSeconds(s string) (int, error) {
 	if len(s) > 2 {
 		return 0, fmt.Errorf("seconds must be 0-59")
 	}
 
-	secs, err := parsePositiveInt(s, "seconds")
+	secs, err := parseNonNegativeInt(s, "seconds")
 	if err != nil {
 		return 0, err
 	}
@@ -80,7 +127,7 @@ func parseSecondsPart(s string) (int, error) {
 	return secs, nil
 }
 
-func parsePositiveInt(s, label string) (int, error) {
+func parseNonNegativeInt(s, label string) (int, error) {
 	if s == "" {
 		return 0, fmt.Errorf("%s must be a number", label)
 	}
@@ -104,4 +151,18 @@ func formatJumpClock(d time.Duration) string {
 	mm := total / 60
 	ss := total % 60
 	return fmt.Sprintf("%02d:%02d", mm, ss)
+}
+
+func formatJumpPlaceholder(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	switch {
+	case d < time.Minute:
+		return "00"
+	case d < time.Hour:
+		return "00:00"
+	default:
+		return "00:00:00"
+	}
 }
