@@ -77,7 +77,6 @@ type Model struct {
 	player   *player.Player
 	playlist *playlist.Playlist
 	vis      *Visualizer
-	// Shift+Left/Right seek step.
 	seekStepLarge time.Duration
 	focus         focusArea
 	eqCursor      int // selected EQ band (0-9)
