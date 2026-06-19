@@ -76,13 +76,13 @@ cliamp https://example.com/stream  # play a URL
 
 Press `Ctrl+K` to see all keybindings.
 
-**Configure remote providers** (Navidrome, Plex, Jellyfin, Spotify, YouTube Music, NetEase Cloud Music) with the interactive wizard:
+**Configure offline playback mode and remote providers** (Navidrome, Plex, Jellyfin, Spotify, YouTube Music, NetEase Cloud Music) with the interactive wizard:
 
 ```sh
 cliamp setup
 ```
 
-It walks you through each provider, validates the connection, and writes the right block to your config file (`~/.config/cliamp/config.toml`, or `%APPDATA%\cliamp\config.toml` on Windows when `HOME` is unset). See [docs/cli.md](docs/cli.md#setup-wizard) for details.
+It walks you through persistent offline playback mode and each provider, validates provider connections, and writes the right config to your config file (`~/.config/cliamp/config.toml`, or `%APPDATA%\cliamp\config.toml` on Windows when `HOME` is unset). See [docs/cli.md](docs/cli.md#setup-wizard) for details.
 
 ## Radio
 

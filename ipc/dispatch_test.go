@@ -20,6 +20,8 @@ func (c *captureDispatcher) Send(msg any) {
 	switch m := msg.(type) {
 	case LoadMsg:
 		m.Reply <- c.autoReply
+	case QueueMsg:
+		m.Reply <- c.autoReply
 	case ThemeMsg:
 		m.Reply <- c.autoReply
 	case VisMsg:
@@ -172,11 +174,14 @@ func TestDispatchQueueMissingPath(t *testing.T) {
 }
 
 func TestDispatchQueue(t *testing.T) {
-	disp := &captureDispatcher{}
+	disp := &captureDispatcher{autoReply: Response{OK: true, Total: 1}}
 	s := newTestServer(disp)
 	resp := s.dispatch(Request{Cmd: "queue", Path: "/music/song.mp3"})
 	if !resp.OK {
 		t.Fatalf("OK = false, err=%q", resp.Error)
+	}
+	if resp.Total != 1 {
+		t.Fatalf("Total = %d, want 1", resp.Total)
 	}
 	got, ok := disp.last.(QueueMsg)
 	if !ok {
@@ -184,6 +189,21 @@ func TestDispatchQueue(t *testing.T) {
 	}
 	if got.Path != "/music/song.mp3" {
 		t.Errorf("Path = %q, want /music/song.mp3", got.Path)
+	}
+	if got.Reply == nil {
+		t.Fatal("Reply is nil")
+	}
+}
+
+func TestDispatchQueueReturnsRejection(t *testing.T) {
+	disp := &captureDispatcher{autoReply: Response{OK: false, Error: "offline mode: remote queue path disabled"}}
+	s := newTestServer(disp)
+	resp := s.dispatch(Request{Cmd: "queue", Path: "https://example.com/song.mp3"})
+	if resp.OK {
+		t.Fatal("OK = true, want false")
+	}
+	if resp.Error == "" {
+		t.Fatal("Error is empty")
 	}
 }
 

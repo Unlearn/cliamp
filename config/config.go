@@ -253,6 +253,7 @@ type Config struct {
 	Plugins          map[string]map[string]string // per-plugin config from [plugins.*] sections
 	LogLevel         string                       // log level: debug, info, warn, error (default "info")
 	LowPower         bool                         // reduce CPU by lowering UI cadence and disabling visualization
+	Offline          bool                         // offline playback mode: use only local music sources
 }
 
 // defaultConfig returns a Config with sensible defaults.
@@ -525,6 +526,8 @@ func Load() (Config, error) {
 				}
 			case "low_power":
 				cfg.LowPower = strings.ToLower(val) == "true"
+			case "offline":
+				cfg.Offline = strings.ToLower(val) == "true"
 			}
 		}
 	}

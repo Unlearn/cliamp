@@ -100,7 +100,11 @@ type LoadMsg struct {
 }
 
 // QueueMsg requests queuing a file path for playback.
-type QueueMsg struct{ Path string }
+// Reply receives confirmation or error if queueing is rejected.
+type QueueMsg struct {
+	Path  string
+	Reply chan Response
+}
 
 // ThemeMsg requests changing the TUI theme by name.
 // Reply receives confirmation or error if theme not found.

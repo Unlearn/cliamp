@@ -177,7 +177,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.adjustScroll()
 			m.notifyAll()
 			// Auto-fetch lyrics when the stream song changes and lyrics overlay is open.
-			if m.lyrics.visible && !m.lyrics.loading {
+			if !m.offline && m.lyrics.visible && !m.lyrics.loading {
 				if artist, song, ok := strings.Cut(title, " - "); ok {
 					q := artist + "\n" + song
 					if q != m.lyrics.query {
@@ -805,6 +805,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if m.offline {
+			for _, track := range tracks {
+				if track.Stream || track.Feed || isRemoteTrackPath(track.Path) {
+					if msg.Reply != nil {
+						msg.Reply <- ipc.Response{OK: false, Error: fmt.Sprintf("offline mode: remote track %q is disabled", track.Path)}
+					}
+					return m, nil
+				}
+			}
+		}
 		m.playlist.Replace(tracks)
 		m.setHeaderStateFromTracks(tracks)
 		m.loadedPlaylist = msg.Playlist
@@ -815,10 +825,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	case ipc.QueueMsg:
+		if m.offline && isRemoteTrackPath(msg.Path) {
+			if msg.Reply != nil {
+				msg.Reply <- ipc.Response{OK: false, Error: fmt.Sprintf("offline mode: remote queue path %q is disabled", msg.Path)}
+			}
+			m.status.Show("Offline mode: remote queue path rejected", statusTTLDefault)
+			return m, nil
+		}
 		t := playlist.Track{Path: msg.Path, Title: msg.Path}
 		m.playlist.Add(t)
 		m.addToHeaderState([]playlist.Track{t})
 		m.notifyAll()
+		if msg.Reply != nil {
+			msg.Reply <- ipc.Response{OK: true, Total: m.playlist.Len()}
+		}
 		return m, nil
 	case ipc.ThemeMsg:
 		// Reload themes from disk to pick up new custom themes.

@@ -44,6 +44,7 @@ func buildApp() *cli.Command {
 		&cli.StringFlag{Name: "playlist", Usage: "load a local TOML playlist by name and start playing"},
 		&cli.StringFlag{Name: "log-level", Usage: "log level: debug, info, warn, error"},
 		&cli.BoolFlag{Name: "low-power", Usage: "low-power mode: reduce CPU by lowering UI cadence and disabling visualization"},
+		&cli.BoolFlag{Name: "offline", Usage: "offline playback mode: use only local music sources"},
 		&cli.BoolFlag{Name: "daemon", Aliases: []string{"d"}, Usage: "run headless (no TUI), serving IPC for scripts/Waybar"},
 	}
 
@@ -203,6 +204,10 @@ func overridesFromFlags(c *cli.Command) (config.Overrides, error) {
 		v := c.Bool("low-power")
 		ov.LowPower = &v
 	}
+	if c.IsSet("offline") {
+		v := c.Bool("offline")
+		ov.Offline = &v
+	}
 	return ov, nil
 }
 
@@ -299,9 +304,9 @@ func pluginsCommand() *cli.Command {
 func setupCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "setup",
-		Usage: "interactive wizard to configure remote providers",
-		Description: "Walks through configuring Navidrome, Plex, Jellyfin, Spotify,\n" +
-			"NetEase, and YouTube Music. Validates connections and writes\n" +
+		Usage: "interactive wizard to configure offline playback and remote providers",
+		Description: "Walks through configuring offline playback mode, Navidrome, Plex,\n" +
+			"Jellyfin, Spotify, NetEase, and YouTube Music. Validates connections and writes\n" +
 			"~/.config/cliamp/config.toml.",
 		Action: func(ctx context.Context, c *cli.Command) error {
 			return cmd.Setup()

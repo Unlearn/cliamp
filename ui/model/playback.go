@@ -185,6 +185,12 @@ func (m *Model) removeSelectedFromPlaylist() {
 // playTrack plays a track, using async HTTP for streams and sync I/O for local files.
 // yt-dlp URLs are streamed via a piped yt-dlp | ffmpeg chain for instant playback.
 func (m *Model) playTrack(track playlist.Track) tea.Cmd {
+	if m.offline && (track.Stream || track.Feed || isRemoteTrackPath(track.Path)) {
+		m.err = errors.New("offline mode: remote playback is disabled")
+		m.status.Show("Offline mode: remote playback is disabled", statusTTLDefault)
+		return nil
+	}
+
 	if track.Feed || playlist.IsFeed(track.Path) {
 		m.feedLoading = true
 		m.status.Show("Loading feed...", statusTTLLong)
@@ -205,7 +211,7 @@ func (m *Model) playTrack(track playlist.Track) tea.Cmd {
 	m.seek.grace = 0
 	m.seek.graceFor = 0
 	var fetchCmd tea.Cmd
-	if m.lyrics.visible && track.Artist != "" && track.Title != "" {
+	if !m.offline && m.lyrics.visible && track.Artist != "" && track.Title != "" {
 		m.lyrics.loading = true
 		m.lyrics.query = track.Artist + "\n" + track.Title
 		fetchCmd = fetchLyricsCmd(track.Artist, track.Title)

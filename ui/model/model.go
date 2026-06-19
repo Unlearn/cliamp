@@ -2,6 +2,7 @@
 package model
 
 import (
+	"strings"
 	"time"
 
 	"cliamp/history"
@@ -290,6 +291,7 @@ type Model struct {
 	autoPlay       bool // start playing immediately on launch
 	lowPower       bool // lower UI/render cadences in low-power mode
 	compact        bool // compact mode: cap frame width at 80 columns
+	offline        bool // disable external network actions
 	heightExpanded bool // tracks whether manual 'x' expansion is active
 
 	// Cached per-tick to avoid repeated speaker.Lock() calls in View().
@@ -358,4 +360,11 @@ func (m Model) isPlaying() bool {
 
 func (m Model) isPaused() bool {
 	return m.player != nil && m.player.IsPaused()
+}
+
+func isRemoteTrackPath(path string) bool {
+	return playlist.IsURL(path) ||
+		playlist.IsYTDL(path) ||
+		strings.HasPrefix(path, "spotify:") ||
+		strings.HasPrefix(path, "ssh://")
 }

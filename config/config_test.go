@@ -43,6 +43,9 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.AutoPlay {
 		t.Error("AutoPlay should be false by default")
 	}
+	if cfg.Offline {
+		t.Error("Offline should be false by default")
+	}
 	if cfg.Shuffle {
 		t.Error("Shuffle should be false by default")
 	}
@@ -542,6 +545,7 @@ func TestOverridesApply(t *testing.T) {
 	compact := true
 	sr := 48000
 	play := true
+	offline := true
 
 	overrides := Overrides{
 		Volume:     &vol,
@@ -552,6 +556,7 @@ func TestOverridesApply(t *testing.T) {
 		Compact:    &compact,
 		SampleRate: &sr,
 		Play:       &play,
+		Offline:    &offline,
 	}
 
 	overrides.Apply(&cfg)
@@ -580,6 +585,9 @@ func TestOverridesApply(t *testing.T) {
 	if !cfg.AutoPlay {
 		t.Error("AutoPlay should be true")
 	}
+	if !cfg.Offline {
+		t.Error("Offline should be true")
+	}
 }
 
 func TestOverridesApplyNil(t *testing.T) {
@@ -595,6 +603,25 @@ func TestOverridesApplyNil(t *testing.T) {
 	}
 	if cfg.Shuffle != original.Shuffle {
 		t.Error("nil overrides changed Shuffle")
+	}
+}
+
+func TestLoadOffline(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	path := filepath.Join(os.Getenv("HOME"), ".config", "cliamp", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("offline = true\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !cfg.Offline {
+		t.Fatal("Offline = false, want true")
 	}
 }
 

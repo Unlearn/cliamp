@@ -1,12 +1,12 @@
 # Configuration
 
-For remote providers (Navidrome, Plex, Jellyfin, Emby, Spotify, NetEase, YouTube Music), the fastest path is the interactive wizard:
+For offline playback mode and remote providers (Navidrome, Plex, Jellyfin, Emby, Spotify, NetEase, YouTube Music), the fastest path is the interactive wizard:
 
 ```sh
 cliamp setup
 ```
 
-It validates your credentials live and writes the right TOML block without touching the rest of your config. See [cli.md](cli.md#setup-wizard) for details.
+It validates provider credentials live and writes the right TOML without touching the rest of your config. See [cli.md](cli.md#setup-wizard) for details.
 
 ## Config directory
 
@@ -75,6 +75,10 @@ vis_volume_linked = true
 # This has the same effect as starting with --low-power.
 low_power = false
 
+# Offline playback mode: use only local music sources during player/TUI/daemon playback.
+# Mounted SMB/NFS paths still work as filesystem paths.
+offline = false
+
 # Compact mode: cap UI width at 80 columns (default: fluid/full-width)
 compact = false
 
@@ -132,6 +136,32 @@ provider = "radio"
 Valid values: `radio` (default), `navidrome`, `spotify`, `plex`, `jellyfin`, `emby`, `soundcloud`, `netease`, `yt`, `youtube`, `ytmusic`.
 
 You can also override from the CLI: `cliamp --provider jellyfin`.
+
+## Offline Playback Mode
+
+Use offline playback mode when you want music playback to stay local:
+
+```toml
+offline = true
+```
+
+To make it persistent without editing TOML by hand:
+
+```sh
+cliamp setup
+```
+
+Select **Offline playback mode**, then **Enable offline playback**.
+
+or for one session:
+
+```sh
+cliamp --offline ~/Music
+```
+
+Offline playback mode forces the Local provider unless `--provider local` is explicitly passed. It disables Radio, configured remote music providers, URL playback/search, remote lyrics lookup, and runtime Lua plugins in the player/TUI/daemon. Files on mounted network shares still work because cliamp treats them as local filesystem paths.
+
+This setting is not a process-wide firewall. Maintenance commands that explicitly fetch or inspect remote resources, such as `cliamp upgrade`, `cliamp plugins install`, `cliamp playlist create --ssh`, or `cliamp playlist enrich`, still run when invoked.
 
 ## SoundCloud
 

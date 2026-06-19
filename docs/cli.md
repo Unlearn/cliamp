@@ -52,6 +52,16 @@ To make this persistent, set it in `~/.config/cliamp/config.toml`:
 low_power = true
 ```
 
+## Offline Playback Mode
+
+```sh
+cliamp --offline ~/Music
+```
+
+Offline playback mode keeps music playback on local sources. It disables Radio, configured remote music providers, URL playback/search, remote lyrics lookup, and runtime Lua plugins in the player/TUI/daemon. Local files still work, including mounted SMB/NFS shares exposed through the filesystem.
+
+This is not a process-wide firewall. Maintenance commands that explicitly fetch or inspect remote resources, such as `cliamp upgrade`, `cliamp plugins install`, or playlist SSH helpers, still do what you asked when you run them.
+
 ## Headless daemon mode
 
 ```sh
@@ -115,13 +125,13 @@ CLI flags override config file values for the current session only. They are not
 
 ## Setup wizard
 
-Configure remote providers (Navidrome, Plex, Jellyfin, Emby, Spotify, NetEase, YouTube Music) through a small TUI. Each provider page links to where to find the required credentials, validates the connection live, and writes the resulting `[provider]` block to `~/.config/cliamp/config.toml` without disturbing the rest of the file.
+Configure offline playback mode and remote providers (Navidrome, Plex, Jellyfin, Emby, Spotify, NetEase, YouTube Music) through a small TUI. Provider pages link to where to find the required credentials, validate the connection live, and write the resulting config to `~/.config/cliamp/config.toml` without disturbing the rest of the file.
 
 ```sh
 cliamp setup
 ```
 
-Keys: `↑/↓` to navigate, `Enter` to confirm or submit, `Esc` to back out, `q` from the menu to quit. Passwords and tokens are masked. Running setup again for an already-configured provider replaces its section in place.
+Keys: `↑/↓` to navigate, `Enter` to confirm or submit, `Esc` to back out, `q` from the menu to quit. Passwords and tokens are masked. Running setup again for an already-configured provider replaces its section in place; selecting Offline playback mode updates the top-level `offline` key.
 
 ## Playlist Management
 

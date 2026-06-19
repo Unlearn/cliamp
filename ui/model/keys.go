@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -710,6 +711,12 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 
 	case "y":
 		m.lyrics.visible = !m.lyrics.visible
+		if m.offline && m.lyrics.visible {
+			m.lyrics.loading = false
+			m.lyrics.err = errors.New("offline mode: lyrics lookup is disabled")
+			m.status.Show("Offline mode: lyrics lookup is disabled", statusTTLDefault)
+			return nil
+		}
 		if m.lyrics.visible && !m.lyrics.loading {
 			artist, title := m.lyricsArtistTitle()
 			if artist != "" && title != "" {
@@ -728,6 +735,10 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.openFileBrowser()
 
 	case "u":
+		if m.offline {
+			m.status.Show("Offline mode: URL loading is disabled", statusTTLDefault)
+			return nil
+		}
 		m.urlInputting = true
 		m.urlInput = ""
 
@@ -898,6 +909,10 @@ func (m *Model) openProviderSearchWith(prov playlist.Provider) {
 			visible: true,
 			screen:  spotSearchInput,
 		}
+		return
+	}
+	if m.offline {
+		m.status.Show("Offline mode: online search is disabled", statusTTLDefault)
 		return
 	}
 	m.netSearch = netSearchState{
@@ -1349,6 +1364,10 @@ func (m *Model) handleNetSearchInputKey(msg tea.KeyPressMsg) tea.Cmd {
 
 	case tea.KeyEnter:
 		if strings.TrimSpace(m.netSearch.query) != "" && !m.netSearch.loading {
+			if m.offline {
+				m.netSearch.err = "offline mode: online search is disabled"
+				return nil
+			}
 			prefix := "ytsearch10:"
 			if m.netSearch.soundcloud {
 				prefix = "scsearch10:"
@@ -1456,6 +1475,10 @@ func (m *Model) handleURLInputKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.urlInputting = false
 		input := strings.TrimSpace(m.urlInput)
 		if input != "" {
+			if m.offline {
+				m.status.Show("Offline mode: URL loading is disabled", statusTTLDefault)
+				return nil
+			}
 			m.feedLoading = true
 			m.status.Show("Loading URL...", statusTTLLong)
 			return resolveRemoteCmd([]string{input}, true)

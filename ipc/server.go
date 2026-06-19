@@ -241,8 +241,9 @@ func (s *Server) dispatch(req Request) Response {
 		if req.Path == "" {
 			return Response{OK: false, Error: "queue requires a path"}
 		}
-		s.disp.Send(QueueMsg{Path: req.Path})
-		return Response{OK: true}
+		reply := make(chan Response, 1)
+		s.disp.Send(QueueMsg{Path: req.Path, Reply: reply})
+		return waitReply(reply, s.done, "queue", 3*time.Second)
 
 	case "theme":
 		if req.Name == "" {

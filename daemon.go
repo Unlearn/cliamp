@@ -24,7 +24,7 @@ import (
 
 // runDaemon runs cliamp without a TUI: serves IPC against the shared
 // player+playlist, auto-advances tracks, exits on SIGINT/SIGTERM.
-func runDaemon(p *player.Player, pl *playlist.Playlist, localProv *local.Provider, autoPlay bool) error {
+func runDaemon(p *player.Player, pl *playlist.Playlist, localProv *local.Provider, autoPlay, offline bool) error {
 	fmt.Fprintf(os.Stderr, "cliamp: running headless (socket: %s)\n", ipc.DefaultSocketPath())
 	applog.Info("daemon: starting headless mode")
 
@@ -32,6 +32,7 @@ func runDaemon(p *player.Player, pl *playlist.Playlist, localProv *local.Provide
 		player:    p,
 		playlist:  pl,
 		localProv: localProv,
+		offline:   offline,
 		quit:      make(chan struct{}, 1),
 	}
 
@@ -90,6 +91,7 @@ type daemon struct {
 	playlist  *playlist.Playlist
 	localProv *local.Provider
 	notifier  playback.Notifier
+	offline   bool
 	quit      chan struct{}
 }
 
@@ -148,7 +150,13 @@ func (d *daemon) Send(msg any) {
 		d.handleLoad(m)
 
 	case ipc.QueueMsg:
+		if d.offline && isRemoteTrackPath(m.Path) {
+			applog.Warn("daemon: offline mode rejected queue path %q", m.Path)
+			reply(m.Reply, ipc.Response{OK: false, Error: fmt.Sprintf("offline mode: remote queue path %q is disabled", m.Path)})
+			return
+		}
 		d.playlist.Add(playlist.Track{Path: m.Path, Title: m.Path})
+		reply(m.Reply, ipc.Response{OK: true, Total: d.playlist.Len()})
 
 	case ipc.ThemeMsg:
 		reply(m.Reply, ipc.Response{OK: false, Error: "theme not available in headless mode"})
@@ -237,6 +245,10 @@ func (d *daemon) playCurrent() {
 // 1-3s of HTTP/yt-dlp setup. The player itself serializes internally.
 // Caller must hold d.mu; the lock is held again on return.
 func (d *daemon) playTrack(track playlist.Track) {
+	if d.offline && (track.Stream || track.Feed || isRemoteTrackPath(track.Path)) {
+		applog.Warn("daemon: offline mode rejected remote track %q", track.Path)
+		return
+	}
 	dur := time.Duration(track.DurationSecs) * time.Second
 	d.mu.Unlock()
 	var err error
@@ -299,6 +311,12 @@ func (d *daemon) handleLoad(m ipc.LoadMsg) {
 	if err != nil {
 		reply(m.Reply, ipc.Response{OK: false, Error: fmt.Sprintf("playlist %q: %v", m.Playlist, err)})
 		return
+	}
+	if d.offline {
+		if path := firstRemoteTrackPath(tracks); path != "" {
+			reply(m.Reply, ipc.Response{OK: false, Error: fmt.Sprintf("offline mode: remote track %q is disabled", path)})
+			return
+		}
 	}
 	d.playlist.Replace(tracks)
 	d.playCurrent()

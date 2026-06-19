@@ -289,6 +289,48 @@ func TestNetEasePickerSelectionFiltersFields(t *testing.T) {
 	}
 }
 
+func TestOfflineSetupSavesTopLevelKey(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	m := newSetupModel()
+
+	offlineIdx := -1
+	for i, p := range m.provs {
+		if p.key == "offline" {
+			offlineIdx = i
+			break
+		}
+	}
+	if offlineIdx < 0 {
+		t.Fatal("offline setup item missing")
+	}
+
+	m.menuCursor = offlineIdx
+	m.handleKey(keyPress(tea.KeyEnter, "")) // open picker
+	if m.stage != stagePicker {
+		t.Fatalf("stage = %v, want stagePicker", m.stage)
+	}
+	m.handleKey(keyPress(tea.KeyEnter, "")) // default: enable
+	if m.stage != stageResult {
+		t.Fatalf("stage = %v, want stageResult", m.stage)
+	}
+
+	cfg := filepath.Join(dir, ".config", "cliamp", "config.toml")
+	got, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(got), "[offline]") {
+		t.Fatalf("offline saved as section: %q", got)
+	}
+	if !strings.Contains(string(got), "offline = true") {
+		t.Fatalf("offline key missing: %q", got)
+	}
+	if !strings.Contains(m.resultText, "offline = true") {
+		t.Fatalf("resultText = %q, want offline save message", m.resultText)
+	}
+}
+
 // TestSaveSection covers the three write paths: new file, append, replace.
 func TestSaveSection(t *testing.T) {
 	dir := t.TempDir()

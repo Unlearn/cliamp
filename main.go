@@ -62,110 +62,118 @@ func run(overrides config.Overrides, positional []string, daemon bool) error {
 		applog.Info("cliamp starting (version=%s level=%s)", appmeta.Version(), appliedLevel)
 	}
 
-	// Build provider list: Radio is always available, Navidrome and Spotify if configured.
-	radioProv := radio.New()
+	// Build provider list. Offline mode exposes only local filesystem-backed
+	// sources; mounted network filesystems still appear as normal local paths.
+	var radioProv *radio.Provider
+	if !cfg.Offline {
+		radioProv = radio.New()
+	}
 	localProv := local.New()
 
 	var providers []model.ProviderEntry
-	providers = append(providers, model.ProviderEntry{Key: "radio", Name: "Radio", Provider: radioProv})
+	if radioProv != nil {
+		providers = append(providers, model.ProviderEntry{Key: "radio", Name: "Radio", Provider: radioProv})
+	}
 	if localProv != nil {
 		providers = append(providers, model.ProviderEntry{Key: "local", Name: "Local", Provider: localProv})
 	}
 
 	var navClient *navidrome.NavidromeClient
-	if c := navidrome.NewFromConfig(cfg.Navidrome); c != nil {
-		navClient = c
-	} else if c := navidrome.NewFromEnv(); c != nil {
-		navClient = c
-	}
-	if navClient != nil {
-		providers = append(providers, model.ProviderEntry{Key: "navidrome", Name: "Navidrome", Provider: navClient})
-	}
-
-	if plexProv := plex.NewFromConfig(cfg.Plex); plexProv != nil {
-		providers = append(providers, model.ProviderEntry{Key: "plex", Name: "Plex", Provider: plexProv})
-	}
-
-	if jellyProv := jellyfin.NewFromConfig(cfg.Jellyfin); jellyProv != nil {
-		providers = append(providers, model.ProviderEntry{Key: "jellyfin", Name: "Jellyfin", Provider: jellyProv})
-	}
-
-	if embyProv := emby.NewFromConfig(cfg.Emby); embyProv != nil {
-		providers = append(providers, model.ProviderEntry{Key: "emby", Name: "Emby", Provider: embyProv})
-	}
-
 	var spotifyProv *spotify.SpotifyProvider
-	if cfg.Spotify.IsSet() {
-		clientID := cfg.Spotify.ResolveClientID(spotify.DefaultClientID)
-		spotifyProv = spotify.New(nil, clientID, cfg.Spotify.Bitrate)
-		if spotifyProv != nil {
-			providers = append(providers, model.ProviderEntry{Key: "spotify", Name: "Spotify", Provider: spotifyProv})
-		} else {
-			fmt.Fprintln(os.Stderr, "Spotify is unavailable in this Windows build.")
-		}
-	}
-
-	if scProv := soundcloud.NewFromConfig(soundcloud.Config{
-		Enabled:     cfg.SoundCloud.Enabled,
-		User:        cfg.SoundCloud.User,
-		CookiesFrom: cfg.SoundCloud.CookiesFrom,
-	}); scProv != nil {
-		// Provider constructors configure resolve-side yt-dlp cookies. Mirror
-		// cookies_from onto the player so streaming yt-dlp invocations use the
-		// same browser session. Last write wins when multiple providers set it.
-		if cfg.SoundCloud.CookiesFrom != "" {
-			player.SetYTDLCookiesFrom(cfg.SoundCloud.CookiesFrom)
-		}
-		providers = append(providers, model.ProviderEntry{Key: "soundcloud", Name: "SoundCloud", Provider: scProv})
-	}
-
-	if neProv := netease.NewFromConfig(netease.Config{
-		Enabled:     cfg.NetEase.Enabled,
-		CookiesFrom: cfg.NetEase.CookiesFrom,
-		UserID:      cfg.NetEase.UserID,
-	}); neProv != nil {
-		if cfg.NetEase.CookiesFrom != "" {
-			player.SetYTDLCookiesFrom(cfg.NetEase.CookiesFrom)
-		}
-		providers = append(providers, model.ProviderEntry{Key: "netease", Name: "NetEase", Provider: neProv})
-	}
-
 	var ytProviders ytmusic.Providers
-	ytWanted := cfg.YouTubeMusic.IsSetOrFallback(ytmusic.FallbackCredentials)
-	if !ytWanted {
-		switch cfg.Provider {
-		case "yt", "youtube", "ytmusic":
-			ytWanted = true
+	if !cfg.Offline {
+		if c := navidrome.NewFromConfig(cfg.Navidrome); c != nil {
+			navClient = c
+		} else if c := navidrome.NewFromEnv(); c != nil {
+			navClient = c
 		}
-	}
-	if ytWanted {
-		ytClientID, ytClientSecret := cfg.YouTubeMusic.ResolveCredentials(ytmusic.FallbackCredentials)
-		if cfg.YouTubeMusic.CookiesFrom != "" {
-			player.SetYTDLCookiesFrom(cfg.YouTubeMusic.CookiesFrom)
+		if navClient != nil {
+			providers = append(providers, model.ProviderEntry{Key: "navidrome", Name: "Navidrome", Provider: navClient})
 		}
-		if ytClientID == "" || ytClientSecret == "" {
-			fmt.Fprintf(os.Stderr, "YouTube: no credentials available (configure client_id/client_secret in config.toml)\n")
-		} else {
-			if !player.YTDLPAvailable() {
-				fmt.Fprintf(os.Stderr, "\nYouTube requires yt-dlp for audio playback.\n")
-				fmt.Fprintf(os.Stderr, "Install command: %s\n\n", player.YtdlpInstallHint())
-				fmt.Fprintf(os.Stderr, "Press Enter to install automatically, or Ctrl+C to skip... ")
-				fmt.Scanln()
-				fmt.Fprintf(os.Stderr, "Installing yt-dlp...\n")
-				if err := player.InstallYTDLP(); err != nil {
-					fmt.Fprintf(os.Stderr, "Installation failed: %v\n", err)
-					fmt.Fprintf(os.Stderr, "YouTube providers disabled. Install manually and restart.\n\n")
-				} else {
-					fmt.Fprintf(os.Stderr, "yt-dlp installed successfully!\n\n")
-				}
+
+		if plexProv := plex.NewFromConfig(cfg.Plex); plexProv != nil {
+			providers = append(providers, model.ProviderEntry{Key: "plex", Name: "Plex", Provider: plexProv})
+		}
+
+		if jellyProv := jellyfin.NewFromConfig(cfg.Jellyfin); jellyProv != nil {
+			providers = append(providers, model.ProviderEntry{Key: "jellyfin", Name: "Jellyfin", Provider: jellyProv})
+		}
+
+		if embyProv := emby.NewFromConfig(cfg.Emby); embyProv != nil {
+			providers = append(providers, model.ProviderEntry{Key: "emby", Name: "Emby", Provider: embyProv})
+		}
+
+		if cfg.Spotify.IsSet() {
+			clientID := cfg.Spotify.ResolveClientID(spotify.DefaultClientID)
+			spotifyProv = spotify.New(nil, clientID, cfg.Spotify.Bitrate)
+			if spotifyProv != nil {
+				providers = append(providers, model.ProviderEntry{Key: "spotify", Name: "Spotify", Provider: spotifyProv})
+			} else {
+				fmt.Fprintln(os.Stderr, "Spotify is unavailable in this Windows build.")
 			}
-			if player.YTDLPAvailable() {
-				ytProviders = ytmusic.New(nil, ytClientID, ytClientSecret, cfg.YouTubeMusic.CookiesFrom != "")
-				providers = append(providers,
-					model.ProviderEntry{Key: "yt", Name: "YouTube (All)", Provider: ytProviders.All},
-					model.ProviderEntry{Key: "youtube", Name: "YouTube", Provider: ytProviders.Video},
-					model.ProviderEntry{Key: "ytmusic", Name: "YouTube Music", Provider: ytProviders.Music},
-				)
+		}
+
+		if scProv := soundcloud.NewFromConfig(soundcloud.Config{
+			Enabled:     cfg.SoundCloud.Enabled,
+			User:        cfg.SoundCloud.User,
+			CookiesFrom: cfg.SoundCloud.CookiesFrom,
+		}); scProv != nil {
+			// Provider constructors configure resolve-side yt-dlp cookies. Mirror
+			// cookies_from onto the player so streaming yt-dlp invocations use the
+			// same browser session. Last write wins when multiple providers set it.
+			if cfg.SoundCloud.CookiesFrom != "" {
+				player.SetYTDLCookiesFrom(cfg.SoundCloud.CookiesFrom)
+			}
+			providers = append(providers, model.ProviderEntry{Key: "soundcloud", Name: "SoundCloud", Provider: scProv})
+		}
+
+		if neProv := netease.NewFromConfig(netease.Config{
+			Enabled:     cfg.NetEase.Enabled,
+			CookiesFrom: cfg.NetEase.CookiesFrom,
+			UserID:      cfg.NetEase.UserID,
+		}); neProv != nil {
+			if cfg.NetEase.CookiesFrom != "" {
+				player.SetYTDLCookiesFrom(cfg.NetEase.CookiesFrom)
+			}
+			providers = append(providers, model.ProviderEntry{Key: "netease", Name: "NetEase", Provider: neProv})
+		}
+
+		ytWanted := cfg.YouTubeMusic.IsSetOrFallback(ytmusic.FallbackCredentials)
+		if !ytWanted {
+			switch cfg.Provider {
+			case "yt", "youtube", "ytmusic":
+				ytWanted = true
+			}
+		}
+		if ytWanted {
+			ytClientID, ytClientSecret := cfg.YouTubeMusic.ResolveCredentials(ytmusic.FallbackCredentials)
+			if cfg.YouTubeMusic.CookiesFrom != "" {
+				player.SetYTDLCookiesFrom(cfg.YouTubeMusic.CookiesFrom)
+			}
+			if ytClientID == "" || ytClientSecret == "" {
+				fmt.Fprintf(os.Stderr, "YouTube: no credentials available (configure client_id/client_secret in config.toml)\n")
+			} else {
+				if !player.YTDLPAvailable() {
+					fmt.Fprintf(os.Stderr, "\nYouTube requires yt-dlp for audio playback.\n")
+					fmt.Fprintf(os.Stderr, "Install command: %s\n\n", player.YtdlpInstallHint())
+					fmt.Fprintf(os.Stderr, "Press Enter to install automatically, or Ctrl+C to skip... ")
+					fmt.Scanln()
+					fmt.Fprintf(os.Stderr, "Installing yt-dlp...\n")
+					if err := player.InstallYTDLP(); err != nil {
+						fmt.Fprintf(os.Stderr, "Installation failed: %v\n", err)
+						fmt.Fprintf(os.Stderr, "YouTube providers disabled. Install manually and restart.\n\n")
+					} else {
+						fmt.Fprintf(os.Stderr, "yt-dlp installed successfully!\n\n")
+					}
+				}
+				if player.YTDLPAvailable() {
+					ytProviders = ytmusic.New(nil, ytClientID, ytClientSecret, cfg.YouTubeMusic.CookiesFrom != "")
+					providers = append(providers,
+						model.ProviderEntry{Key: "yt", Name: "YouTube (All)", Provider: ytProviders.All},
+						model.ProviderEntry{Key: "youtube", Name: "YouTube", Provider: ytProviders.Video},
+						model.ProviderEntry{Key: "ytmusic", Name: "YouTube Music", Provider: ytProviders.Music},
+					)
+				}
 			}
 		}
 	}
@@ -178,6 +186,9 @@ func run(overrides config.Overrides, positional []string, daemon bool) error {
 	}
 
 	if len(positional) > 0 && (positional[0] == "search" || positional[0] == "search-sc") {
+		if cfg.Offline {
+			return fmt.Errorf("offline mode: online search is disabled")
+		}
 		if len(positional) == 1 {
 			return fmt.Errorf("search requires a query string (e.g. cliamp search \"never gonna give you up\")")
 		}
@@ -189,6 +200,10 @@ func run(overrides config.Overrides, positional []string, daemon bool) error {
 		positional = []string{prefix + query}
 	}
 
+	if cfg.Offline && hasRemoteInputs(positional) {
+		return fmt.Errorf("offline mode: remote URLs and online searches are disabled")
+	}
+
 	resolved, err := resolve.Args(positional)
 	if err != nil {
 		return err
@@ -198,8 +213,14 @@ func run(overrides config.Overrides, positional []string, daemon bool) error {
 	if defaultProvider == "" {
 		defaultProvider = "radio"
 	}
+	if cfg.Offline && overrides.Provider == nil {
+		defaultProvider = "local"
+	}
+	if cfg.Offline && defaultProvider != "" && defaultProvider != "local" {
+		return fmt.Errorf("offline mode: provider %q is unavailable; use provider = \"local\"", defaultProvider)
+	}
 
-	defaultRadio := len(positional) == 0 && defaultProvider == "radio"
+	defaultRadio := !cfg.Offline && len(positional) == 0 && defaultProvider == "radio"
 
 	pl := playlist.New()
 	if cfg.Playlist != "" && localProv != nil {
@@ -216,6 +237,11 @@ func run(overrides config.Overrides, positional []string, daemon bool) error {
 		)
 	}
 	pl.Add(resolved.Tracks...)
+	if cfg.Offline {
+		if path := firstRemoteTrackPath(pl.Tracks()); path != "" {
+			return fmt.Errorf("offline mode: remote track %q is disabled", path)
+		}
+	}
 
 	// Daemon mode has no UI loop to drain pending URLs (feeds, M3U, yt-dlp),
 	// so resolve them synchronously here. The TUI path does this in the
@@ -270,14 +296,18 @@ func run(overrides config.Overrides, positional []string, daemon bool) error {
 	ui.SetPadding(cfg.PaddingH, cfg.PaddingV)
 
 	if daemon {
-		return runDaemon(p, pl, localProv, cfg.AutoPlay)
+		return runDaemon(p, pl, localProv, cfg.AutoPlay, cfg.Offline)
 	}
 
 	themes := theme.LoadAll()
 
-	luaMgr, luaErr := luaplugin.New(cfg.Plugins)
-	if luaErr != nil {
-		fmt.Fprintf(os.Stderr, "lua plugins: %v\n", luaErr)
+	var luaMgr *luaplugin.Manager
+	if !cfg.Offline {
+		var luaErr error
+		luaMgr, luaErr = luaplugin.New(cfg.Plugins)
+		if luaErr != nil {
+			fmt.Fprintf(os.Stderr, "lua plugins: %v\n", luaErr)
+		}
 	}
 	if luaMgr != nil {
 		defer luaMgr.Close()
@@ -286,6 +316,7 @@ func run(overrides config.Overrides, positional []string, daemon bool) error {
 
 	m := model.New(p, pl, providers, defaultProvider, localProv, themes, luaMgr, config.SaveFunc{})
 	m.SetVisVolumeLinked(cfg.VisVolumeLinked)
+	m.SetOffline(cfg.Offline)
 
 	if luaMgr != nil {
 		luaMgr.SetStateProvider(luaplugin.StateProvider{
@@ -486,6 +517,31 @@ func wireMediaCtl(prog *tea.Program) (*mediactl.Service, error) {
 	}
 	go prog.Send(model.AttachNotifier(svc))
 	return svc, nil
+}
+
+func hasRemoteInputs(args []string) bool {
+	for _, arg := range args {
+		if isRemoteTrackPath(arg) {
+			return true
+		}
+	}
+	return false
+}
+
+func firstRemoteTrackPath(tracks []playlist.Track) string {
+	for _, track := range tracks {
+		if track.Stream || track.Feed || isRemoteTrackPath(track.Path) {
+			return track.Path
+		}
+	}
+	return ""
+}
+
+func isRemoteTrackPath(path string) bool {
+	return playlist.IsURL(path) ||
+		playlist.IsYTDL(path) ||
+		strings.HasPrefix(path, "spotify:") ||
+		strings.HasPrefix(path, "ssh://")
 }
 
 func ipcSend(req ipc.Request) (ipc.Response, error) {

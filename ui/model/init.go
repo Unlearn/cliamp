@@ -90,6 +90,9 @@ func (m *Model) SetAutoPlay(v bool) { m.autoPlay = v }
 // SetLowPower lowers UI cadences without affecting normal mode.
 func (m *Model) SetLowPower(v bool) { m.lowPower = v }
 
+// SetOffline disables runtime actions that would make external network calls.
+func (m *Model) SetOffline(v bool) { m.offline = v }
+
 // SetCompact enables compact mode which caps the frame width at 80 columns.
 func (m *Model) SetCompact(v bool) {
 	m.compact = v
@@ -194,7 +197,7 @@ func (m Model) Init() tea.Cmd {
 	if m.provider != nil {
 		cmds = append(cmds, fetchPlaylistsCmd(m.provider))
 	}
-	if len(m.pendingURLs) > 0 {
+	if !m.offline && len(m.pendingURLs) > 0 {
 		cmds = append(cmds, resolveRemoteCmd(m.pendingURLs, m.autoPlay))
 	}
 	if m.autoPlay && m.playlist.Len() > 0 {

@@ -46,6 +46,10 @@ eq = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 # Default provider on startup: "radio", "navidrome", "spotify", "plex", "jellyfin", "emby", "soundcloud", "netease", or a YouTube provider
 # provider = "radio"
 
+# Offline playback mode: use only local music sources during player/TUI/daemon playback.
+# Mounted SMB/NFS paths still work as filesystem paths.
+# offline = false
+
 # Compact mode: cap UI width at 80 columns (default: fluid/full-width)
 # compact = true
 

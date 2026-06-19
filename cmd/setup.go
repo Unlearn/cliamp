@@ -1,9 +1,9 @@
 // Package cmd implements interactive subcommands invoked from the CLI.
 // setup.go contains the provider onboarding wizard reachable via
 // `cliamp setup`. It walks the user through configuring each remote
-// provider (Navidrome, Plex, Jellyfin, Spotify, NetEase, YouTube Music),
-// validates the connection where possible, and writes the resulting
-// TOML section to ~/.config/cliamp/config.toml.
+// provider (Navidrome, Plex, Jellyfin, Spotify, NetEase, YouTube Music)
+// plus top-level setup choices, validates the connection where possible,
+// and writes the resulting TOML to ~/.config/cliamp/config.toml.
 //
 // The UI is a small standalone Bubbletea+Lipgloss program — separate from
 // the main player Model — because setup runs to completion and exits.
@@ -25,6 +25,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"cliamp/config"
 	"cliamp/external/emby"
 	"cliamp/external/jellyfin"
 	"cliamp/external/navidrome"
@@ -65,6 +66,8 @@ type providerSpec struct {
 	validate func(map[string]string) error
 	// body returns the TOML block body (no header).
 	body func(map[string]string) string
+	// save persists custom setup entries that are not provider sections.
+	save func(map[string]string) (string, error)
 	// extraValidate runs after the form before validate, e.g. to enforce
 	// "token OR (user+password)" for Jellyfin.
 	extraValidate func(map[string]string) error
@@ -92,10 +95,35 @@ const (
 	keyNetEaseBrowser = "_netease_browser"
 	keyYTMusicMode    = "_mode"
 	keySpotifyMode    = "_spotify_mode"
+	keyOfflineMode    = "_offline_mode"
 )
 
 func providers() []providerSpec {
 	return []providerSpec{
+		{
+			key:  "offline",
+			name: "Offline playback mode",
+			intro: []string{
+				"Use local music sources for playback.",
+				"Radio, remote providers, and URL streams are disabled.",
+				"Mounted SMB/NFS shares still work as filesystem paths.",
+			},
+			picker: &pickerSpec{
+				key:   keyOfflineMode,
+				label: "Offline playback mode",
+				options: []pickerOption{
+					{value: "true", label: "Enable offline playback"},
+					{value: "false", label: "Disable offline playback"},
+				},
+			},
+			save: func(v map[string]string) (string, error) {
+				enabled := strings.TrimSpace(v[keyOfflineMode]) == "true"
+				if err := config.Save("offline", strconv.FormatBool(enabled)); err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("Saved offline = %v.", enabled), nil
+			},
+		},
 		{
 			key:     "navidrome",
 			name:    "Navidrome / Subsonic",
@@ -745,17 +773,30 @@ func (m *setupModel) onValidateDone(err error) (tea.Model, tea.Cmd) {
 // indicates the user opted to save despite a failed probe.
 func (m *setupModel) persistAndDone(warn bool) tea.Cmd {
 	spec := m.provs[m.pidx]
-	body := spec.body(m.values)
-	if err := saveSection(spec.section, body); err != nil {
-		m.saveFailed = err
-		m.stage = stageResult
-		m.awaitingSave = false
-		return nil
+	resultText := ""
+	if spec.save != nil {
+		msg, err := spec.save(m.values)
+		if err != nil {
+			m.saveFailed = err
+			m.stage = stageResult
+			m.awaitingSave = false
+			return nil
+		}
+		resultText = msg
+	} else {
+		body := spec.body(m.values)
+		if err := saveSection(spec.section, body); err != nil {
+			m.saveFailed = err
+			m.stage = stageResult
+			m.awaitingSave = false
+			return nil
+		}
+		resultText = fmt.Sprintf("Saved [%s] section.", spec.section)
 	}
 	m.stage = stageResult
 	m.awaitingSave = false
 	m.resultWarning = warn
-	m.resultText = fmt.Sprintf("Saved [%s] section.", spec.section)
+	m.resultText = resultText
 	return nil
 }
 
@@ -823,7 +864,7 @@ var (
 const (
 	maxCardWidth = 78
 	logoLine1    = "  cliamp setup"
-	logoLine2    = "  configure remote providers"
+	logoLine2    = "  configure playback mode and remote providers"
 )
 
 func (m *setupModel) View() tea.View {
