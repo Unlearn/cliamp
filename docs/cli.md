@@ -133,6 +133,8 @@ cliamp setup
 
 Keys: `↑/↓` to navigate, `Enter` to confirm or submit, `Esc` to back out, `q` from the menu to quit. Passwords and tokens are masked. Running setup again for an already-configured provider replaces its section in place; selecting Offline playback mode updates the top-level `offline` key.
 
+If offline playback is enabled when you save an enabled remote provider, setup turns offline playback off so the provider appears on next launch.
+
 ## Playlist Management
 
 Manage local TOML playlists from the command line without opening the TUI.

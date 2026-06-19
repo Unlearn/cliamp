@@ -463,6 +463,7 @@ type setupModel struct {
 	resultErr     error
 	resultWarning bool   // validation failed but config still valid
 	resultText    string // overall message (e.g. "Saved [navidrome] section.")
+	resultNote    string // secondary result line
 	saveFailed    error  // io error writing config (rare; shown as error result)
 	awaitingSave  bool   // true after a failed validate: waiting for y/n
 
@@ -613,6 +614,7 @@ func (m *setupModel) startProvider(idx int) {
 	m.pickerCursor = 0
 	m.resultErr = nil
 	m.resultText = ""
+	m.resultNote = ""
 	m.resultWarning = false
 	m.awaitingSave = false
 	m.saveFailed = nil
@@ -795,6 +797,12 @@ func (m *setupModel) persistAndDone(warn bool) tea.Cmd {
 	}
 	m.stage = stageResult
 	m.awaitingSave = false
+	if disabled, err := maybeDisableOfflineAfterRemoteSave(spec, m.values); err != nil {
+		m.saveFailed = err
+		return nil
+	} else if disabled {
+		m.resultNote = "Streaming configured. Offline mode disabled"
+	}
 	m.resultWarning = warn
 	m.resultText = resultText
 	return nil
@@ -821,6 +829,30 @@ func (m *setupModel) resultKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+func maybeDisableOfflineAfterRemoteSave(spec providerSpec, values map[string]string) (bool, error) {
+	if !remotePlaybackProviderConfigured(spec, values) {
+		return false, nil
+	}
+	cfg, err := config.Load()
+	if err != nil || !cfg.Offline {
+		return false, err
+	}
+	if err := config.Save("offline", "false"); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func remotePlaybackProviderConfigured(spec providerSpec, values map[string]string) bool {
+	if spec.key == "" || spec.key == "offline" || spec.section == "" {
+		return false
+	}
+	if spec.key == "ytmusic" && values[keyYTMusicMode] == "off" {
+		return false
+	}
+	return true
 }
 
 // refreshVisibleFields recomputes the visible-field index list based on
@@ -1039,6 +1071,10 @@ func (m *setupModel) viewResult() string {
 		b.WriteString(warnStyle.Render("⚠ Saved without verification"))
 	} else {
 		b.WriteString(okStyle.Render("✓ " + m.resultText))
+	}
+	if m.resultNote != "" {
+		b.WriteString("\n")
+		b.WriteString(hintStyle.Render(m.resultNote))
 	}
 	b.WriteString("\n\n")
 	b.WriteString(dimStyle.Render(m.cfgPath))

@@ -163,6 +163,8 @@ Offline playback mode forces the Local provider unless `--provider local` is exp
 
 This setting is not a process-wide firewall. Maintenance commands that explicitly fetch or inspect remote resources, such as `cliamp upgrade`, `cliamp plugins install`, `cliamp playlist create --ssh`, or `cliamp playlist enrich`, still run when invoked.
 
+When offline playback is enabled and you save an enabled remote provider in `cliamp setup`, setup turns offline playback off so the provider appears on next launch.
+
 ## SoundCloud
 
 SoundCloud is opt-in. Add the section to `~/.config/cliamp/config.toml` to register the provider:

@@ -331,6 +331,162 @@ func TestOfflineSetupSavesTopLevelKey(t *testing.T) {
 	}
 }
 
+func TestRemoteSetupDisablesOffline(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	if err := os.MkdirAll(filepath.Join(dir, ".config", "cliamp"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, ".config", "cliamp", "config.toml")
+	if err := os.WriteFile(cfg, []byte("offline = true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := newSetupModel()
+	m.menuCursor = setupIndex(t, m, "ytmusic")
+	m.handleKey(keyPress(tea.KeyEnter, "")) // open picker
+	m.handleKey(keyPress(tea.KeyEnter, "")) // default: enabled, no fields
+	if m.stage != stageResult {
+		t.Fatalf("stage = %v, want stageResult", m.stage)
+	}
+	if m.resultNote != "Streaming configured. Offline mode disabled" {
+		t.Fatalf("resultNote = %q, want streaming enabled note", m.resultNote)
+	}
+	if strings.Contains(m.resultText, "Offline playback") {
+		t.Fatalf("resultText = %q, want offline note on separate line", m.resultText)
+	}
+	view := m.viewResult()
+	resultIdx := strings.Index(view, m.resultText)
+	noteIdx := strings.Index(view, m.resultNote)
+	if resultIdx < 0 || noteIdx < 0 || noteIdx <= resultIdx {
+		t.Fatalf("view missing separate streaming note:\n%s", view)
+	}
+	between := view[resultIdx+len(m.resultText) : noteIdx]
+	if strings.Count(between, "\n") != 1 {
+		t.Fatalf("view note spacing = %q, want one newline", between)
+	}
+	if !strings.Contains(view, hintStyle.Render(m.resultNote)) {
+		t.Fatalf("view note is not rendered with hint style:\n%s", view)
+	}
+
+	got, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "offline = false") {
+		t.Fatalf("offline not disabled: %q", got)
+	}
+}
+
+func TestRemoteSetupLeavesOfflineDisabled(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	cfgDir := filepath.Join(dir, ".config", "cliamp")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte("offline = false\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := newSetupModel()
+	m.menuCursor = setupIndex(t, m, "ytmusic")
+	m.handleKey(keyPress(tea.KeyEnter, "")) // open picker
+	m.handleKey(keyPress(tea.KeyEnter, "")) // default: enabled, no fields
+	if m.stage != stageResult {
+		t.Fatalf("stage = %v, want stageResult", m.stage)
+	}
+	got, err := os.ReadFile(filepath.Join(cfgDir, "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "offline = false") {
+		t.Fatalf("offline changed unexpectedly: %q", got)
+	}
+	if m.resultNote != "" {
+		t.Fatalf("resultNote = %q, should not report disabling already-disabled offline playback", m.resultNote)
+	}
+}
+
+func TestDisabledRemoteSetupDoesNotDisableOffline(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	cfgDir := filepath.Join(dir, ".config", "cliamp")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte("offline = true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := newSetupModel()
+	m.menuCursor = setupIndex(t, m, "ytmusic")
+	m.handleKey(keyPress(tea.KeyEnter, "")) // open picker
+	m.pickerCursor = 2                      // Disable YouTube Music
+	m.handleKey(keyPress(tea.KeyEnter, ""))
+	if m.stage != stageResult {
+		t.Fatalf("stage = %v, want stageResult", m.stage)
+	}
+	got, err := os.ReadFile(filepath.Join(cfgDir, "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "offline = true") {
+		t.Fatalf("offline changed unexpectedly: %q", got)
+	}
+}
+
+func TestSaveAnywayDisablesOffline(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	cfgDir := filepath.Join(dir, ".config", "cliamp")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte("offline = true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := newSetupModel()
+	m.provs = []providerSpec{{
+		key:     "testremote",
+		name:    "Test Remote",
+		section: "testremote",
+		body:    func(map[string]string) string { return "enabled = true" },
+	}}
+	m.pidx = 0
+	m.values = map[string]string{}
+	m.stage = stageResult
+	m.awaitingSave = true
+	m.resultErr = os.ErrDeadlineExceeded
+
+	m.handleKey(keyPress('y', "y"))
+	if !m.resultWarning {
+		t.Fatal("resultWarning = false, want save-anyway warning")
+	}
+	got, err := os.ReadFile(filepath.Join(cfgDir, "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "offline = false") {
+		t.Fatalf("offline not disabled after save anyway: %q", got)
+	}
+	if m.resultNote != "Streaming configured. Offline mode disabled" {
+		t.Fatalf("resultNote = %q, want streaming enabled note", m.resultNote)
+	}
+}
+
+func setupIndex(t *testing.T, m *setupModel, key string) int {
+	t.Helper()
+	for i, p := range m.provs {
+		if p.key == key {
+			return i
+		}
+	}
+	t.Fatalf("setup item %q missing", key)
+	return -1
+}
+
 // TestSaveSection covers the three write paths: new file, append, replace.
 func TestSaveSection(t *testing.T) {
 	dir := t.TempDir()
