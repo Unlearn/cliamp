@@ -194,7 +194,7 @@ func (m Model) Init() tea.Cmd {
 		m.luaMgr.Emit(luaplugin.EventAppStart, nil)
 	}
 	cmds := []tea.Cmd{tickCmd(), func() tea.Msg { return tea.RequestWindowSize() }}
-	if m.provider != nil {
+	if m.provider != nil && m.focus == focusProvider {
 		cmds = append(cmds, fetchPlaylistsCmd(m.provider))
 	}
 	if !m.offline && len(m.pendingURLs) > 0 {

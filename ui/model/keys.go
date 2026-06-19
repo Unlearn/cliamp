@@ -440,7 +440,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 			m.refreshChrome()
 		} else if m.focus == focusPlaylist {
 			// Keep current expanded/collapsed height mode when switching focus.
-			m.focus = focusProvider
+			return m.focusProviderPane()
 		}
 
 	case "space":

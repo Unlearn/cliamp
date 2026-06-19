@@ -209,15 +209,9 @@ func run(overrides config.Overrides, positional []string, daemon bool) error {
 		return err
 	}
 
-	defaultProvider := cfg.Provider
-	if defaultProvider == "" {
-		defaultProvider = "radio"
-	}
-	if cfg.Offline && overrides.Provider == nil {
-		defaultProvider = "local"
-	}
-	if cfg.Offline && defaultProvider != "" && defaultProvider != "local" {
-		return fmt.Errorf("offline mode: provider %q is unavailable; use provider = \"local\"", defaultProvider)
+	defaultProvider, err := selectDefaultProvider(cfg.Provider, cfg.Offline, overrides.Provider != nil)
+	if err != nil {
+		return err
 	}
 
 	defaultRadio := !cfg.Offline && len(positional) == 0 && defaultProvider == "radio"
@@ -517,6 +511,22 @@ func wireMediaCtl(prog *tea.Program) (*mediactl.Service, error) {
 	}
 	go prog.Send(model.AttachNotifier(svc))
 	return svc, nil
+}
+
+func selectDefaultProvider(configured string, offline, providerOverrideSet bool) (string, error) {
+	defaultProvider := configured
+	if defaultProvider == "" {
+		defaultProvider = "radio"
+	}
+	if offline {
+		if !providerOverrideSet {
+			return "local", nil
+		}
+		if defaultProvider != "local" {
+			return "", fmt.Errorf("offline mode: provider %q is unavailable; use provider = \"local\"", defaultProvider)
+		}
+	}
+	return defaultProvider, nil
 }
 
 func hasRemoteInputs(args []string) bool {

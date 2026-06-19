@@ -30,6 +30,18 @@ func (m *Model) StartInProvider() {
 	}
 }
 
+func (m *Model) focusProviderPane() tea.Cmd {
+	if m.provider == nil {
+		return nil
+	}
+	m.focus = focusProvider
+	if len(m.providerLists) > 0 || m.provLoading {
+		return nil
+	}
+	m.resetProviderNav()
+	return fetchPlaylistsCmd(m.provider)
+}
+
 // switchProvider sets the active provider by pill index and fetches its playlists.
 func (m *Model) switchProvider(idx int) tea.Cmd {
 	if idx < 0 || idx >= len(m.providers) {
