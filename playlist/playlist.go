@@ -73,6 +73,33 @@ func TotalDurationSecs(tracks []Track) int {
 	return total
 }
 
+// IsRemotePlaybackPath reports whether path requires external or network
+// access during playback. Mounted SMB/NFS shares are normal filesystem paths
+// and intentionally return false here.
+func IsRemotePlaybackPath(path string) bool {
+	return IsURL(path) ||
+		IsYTDL(path) ||
+		strings.HasPrefix(path, "spotify:") ||
+		strings.HasPrefix(path, "ssh://")
+}
+
+// IsRemotePlaybackTrack reports whether track playback would use a remote
+// source instead of local filesystem access.
+func IsRemotePlaybackTrack(track Track) bool {
+	return track.Stream || track.Feed || IsRemotePlaybackPath(track.Path)
+}
+
+// FirstRemotePlaybackPath returns the first remote playback path in tracks, or
+// an empty string when every track is local.
+func FirstRemotePlaybackPath(tracks []Track) string {
+	for _, track := range tracks {
+		if IsRemotePlaybackTrack(track) {
+			return track.Path
+		}
+	}
+	return ""
+}
+
 // IsURL reports whether path is an HTTP or HTTPS URL, or a yt-dlp search protocol string.
 func IsURL(path string) bool {
 	return strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") ||

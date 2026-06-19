@@ -327,6 +327,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tracksLoadedMsg:
+		if m.rejectOfflineRemoteTracks(msg) {
+			m.provLoading = false
+			return m, nil
+		}
 		if m.player.IsPlaying() || m.buffering {
 			m.detachPlaybackTrack()
 			m.player.ClearPreload()
@@ -521,6 +525,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fbTracksResolvedMsg:
 		if len(msg.tracks) == 0 {
 			m.status.Show("No audio files found", statusTTLDefault)
+			return m, nil
+		}
+		if m.rejectOfflineRemoteTracks(msg.tracks) {
 			return m, nil
 		}
 		if msg.replace {
@@ -758,6 +765,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.handlePluginQueue(msg)
 
 	case pluginQueueAddedMsg:
+		if m.rejectOfflineRemoteTracks(msg.tracks) {
+			return m, nil
+		}
 		if len(msg.tracks) > 0 {
 			m.playlist.Add(msg.tracks...)
 			m.notifyPlayback()
@@ -806,13 +816,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.offline {
-			for _, track := range tracks {
-				if track.Stream || track.Feed || isRemoteTrackPath(track.Path) {
-					if msg.Reply != nil {
-						msg.Reply <- ipc.Response{OK: false, Error: fmt.Sprintf("offline mode: remote track %q is disabled", track.Path)}
-					}
-					return m, nil
+			if path := playlist.FirstRemotePlaybackPath(tracks); path != "" {
+				if msg.Reply != nil {
+					msg.Reply <- ipc.Response{OK: false, Error: fmt.Sprintf("offline mode: remote track %q is disabled", path)}
 				}
+				return m, nil
 			}
 		}
 		m.playlist.Replace(tracks)
@@ -825,7 +833,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	case ipc.QueueMsg:
-		if m.offline && isRemoteTrackPath(msg.Path) {
+		if m.offline && playlist.IsRemotePlaybackPath(msg.Path) {
 			if msg.Reply != nil {
 				msg.Reply <- ipc.Response{OK: false, Error: fmt.Sprintf("offline mode: remote queue path %q is disabled", msg.Path)}
 			}

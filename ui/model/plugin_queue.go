@@ -27,7 +27,7 @@ type pluginQueueAddedMsg struct{ tracks []playlist.Track }
 func (m *Model) handlePluginQueue(msg PluginQueueMsg) tea.Cmd {
 	switch msg.Op {
 	case "add":
-		if m.offline && isRemoteTrackPath(msg.Path) {
+		if m.offline && playlist.IsRemotePlaybackPath(msg.Path) {
 			m.status.Show("Offline mode: remote plugin queue path rejected", statusTTLDefault)
 			return nil
 		}

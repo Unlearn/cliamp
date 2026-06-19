@@ -150,7 +150,7 @@ func (d *daemon) Send(msg any) {
 		d.handleLoad(m)
 
 	case ipc.QueueMsg:
-		if d.offline && isRemoteTrackPath(m.Path) {
+		if d.offline && playlist.IsRemotePlaybackPath(m.Path) {
 			applog.Warn("daemon: offline mode rejected queue path %q", m.Path)
 			reply(m.Reply, ipc.Response{OK: false, Error: fmt.Sprintf("offline mode: remote queue path %q is disabled", m.Path)})
 			return
@@ -245,7 +245,7 @@ func (d *daemon) playCurrent() {
 // 1-3s of HTTP/yt-dlp setup. The player itself serializes internally.
 // Caller must hold d.mu; the lock is held again on return.
 func (d *daemon) playTrack(track playlist.Track) {
-	if d.offline && (track.Stream || track.Feed || isRemoteTrackPath(track.Path)) {
+	if d.offline && playlist.IsRemotePlaybackTrack(track) {
 		applog.Warn("daemon: offline mode rejected remote track %q", track.Path)
 		return
 	}
@@ -313,7 +313,7 @@ func (d *daemon) handleLoad(m ipc.LoadMsg) {
 		return
 	}
 	if d.offline {
-		if path := firstRemoteTrackPath(tracks); path != "" {
+		if path := playlist.FirstRemotePlaybackPath(tracks); path != "" {
 			reply(m.Reply, ipc.Response{OK: false, Error: fmt.Sprintf("offline mode: remote track %q is disabled", path)})
 			return
 		}

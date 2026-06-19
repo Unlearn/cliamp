@@ -46,6 +46,9 @@ func (m *Model) preloadNext() tea.Cmd {
 	if !ok {
 		return nil
 	}
+	if m.offline && playlist.IsRemotePlaybackTrack(next) {
+		return nil
+	}
 	// Preload yt-dlp tracks with the same lead-time deferral as HTTP streams.
 	if playlist.IsYTDL(next.Path) {
 		dur := m.player.Duration()

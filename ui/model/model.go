@@ -2,7 +2,6 @@
 package model
 
 import (
-	"strings"
 	"time"
 
 	"cliamp/history"
@@ -360,11 +359,4 @@ func (m Model) isPlaying() bool {
 
 func (m Model) isPaused() bool {
 	return m.player != nil && m.player.IsPaused()
-}
-
-func isRemoteTrackPath(path string) bool {
-	return playlist.IsURL(path) ||
-		playlist.IsYTDL(path) ||
-		strings.HasPrefix(path, "spotify:") ||
-		strings.HasPrefix(path, "ssh://")
 }

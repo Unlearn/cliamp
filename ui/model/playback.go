@@ -94,6 +94,9 @@ func (m *Model) playCurrentTrack() tea.Cmd {
 // playTrackImmediate appends a track to the playlist and starts playing it now,
 // stopping any current playback. Used by search-result "Play now" actions.
 func (m *Model) playTrackImmediate(track playlist.Track) tea.Cmd {
+	if m.rejectOfflineRemoteTrack(track) {
+		return nil
+	}
 	m.player.Stop()
 	m.player.ClearPreload()
 	m.playlist.Add(track)
@@ -110,6 +113,9 @@ func (m *Model) playTrackImmediate(track playlist.Track) tea.Cmd {
 
 // appendTrack appends a track to the playlist; auto-plays if nothing is playing.
 func (m *Model) appendTrack(track playlist.Track) tea.Cmd {
+	if m.rejectOfflineRemoteTrack(track) {
+		return nil
+	}
 	wasEmpty := m.playlist.Len() == 0
 	m.playlist.Add(track)
 	m.addToHeaderState([]playlist.Track{track})
@@ -141,6 +147,9 @@ func (m *Model) closeSpotSearch() {
 
 // queueTrackNext adds a track to the playlist and queues it to play next.
 func (m *Model) queueTrackNext(track playlist.Track) tea.Cmd {
+	if m.rejectOfflineRemoteTrack(track) {
+		return nil
+	}
 	m.playlist.Add(track)
 	m.addToHeaderState([]playlist.Track{track})
 	idx := m.playlist.Len() - 1
@@ -185,7 +194,7 @@ func (m *Model) removeSelectedFromPlaylist() {
 // playTrack plays a track, using async HTTP for streams and sync I/O for local files.
 // yt-dlp URLs are streamed via a piped yt-dlp | ffmpeg chain for instant playback.
 func (m *Model) playTrack(track playlist.Track) tea.Cmd {
-	if m.offline && (track.Stream || track.Feed || isRemoteTrackPath(track.Path)) {
+	if m.offline && playlist.IsRemotePlaybackTrack(track) {
 		m.err = errors.New("offline mode: remote playback is disabled")
 		m.status.Show("Offline mode: remote playback is disabled", statusTTLDefault)
 		return nil

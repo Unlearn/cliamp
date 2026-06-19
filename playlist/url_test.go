@@ -31,6 +31,40 @@ func TestIsURL(t *testing.T) {
 	}
 }
 
+func TestIsRemotePlaybackPath(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"local absolute", "/Volumes/music/song.flac", false},
+		{"local relative", "Music/song.flac", false},
+		{"windows unc", `\\server\share\song.flac`, false},
+		{"http", "https://example.com/song.mp3", true},
+		{"yt search", "ytsearch1:lofi", true},
+		{"spotify", "spotify:track:abc", true},
+		{"ssh", "ssh://host/path/song.flac", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsRemotePlaybackPath(tt.path); got != tt.want {
+				t.Fatalf("IsRemotePlaybackPath(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFirstRemotePlaybackPath(t *testing.T) {
+	tracks := []Track{
+		{Path: "/music/local.flac"},
+		{Path: "https://example.com/stream", Stream: true},
+	}
+	if got := FirstRemotePlaybackPath(tracks); got != "https://example.com/stream" {
+		t.Fatalf("FirstRemotePlaybackPath = %q", got)
+	}
+}
+
 func TestIsM3U(t *testing.T) {
 	tests := []struct {
 		path string

@@ -12,39 +12,46 @@ import (
 
 type playbackFakeEngine struct {
 	playing           bool
-	playCalls         []string
-	preloadCalls      []string
+	playPaths         []string
+	preloadPaths      []string
 	clearPreloadCalls int
 }
 
 func (f *playbackFakeEngine) Play(path string, _ time.Duration) error {
 	f.playing = true
-	f.playCalls = append(f.playCalls, path)
+	f.playPaths = append(f.playPaths, path)
 	return nil
 }
-func (f *playbackFakeEngine) PlayYTDL(string, time.Duration) error { return nil }
+func (f *playbackFakeEngine) PlayYTDL(path string, _ time.Duration) error {
+	f.playing = true
+	f.playPaths = append(f.playPaths, path)
+	return nil
+}
 func (f *playbackFakeEngine) Preload(path string, _ time.Duration) error {
-	f.preloadCalls = append(f.preloadCalls, path)
+	f.preloadPaths = append(f.preloadPaths, path)
 	return nil
 }
-func (f *playbackFakeEngine) PreloadYTDL(string, time.Duration) error { return nil }
-func (f *playbackFakeEngine) ClearPreload()                           { f.clearPreloadCalls++ }
-func (f *playbackFakeEngine) Stop()                                   { f.playing = false }
-func (f *playbackFakeEngine) Close()                                  {}
-func (f *playbackFakeEngine) TogglePause()                            {}
-func (f *playbackFakeEngine) Seek(time.Duration) error                { return nil }
-func (f *playbackFakeEngine) SeekYTDL(time.Duration) error            { return nil }
-func (f *playbackFakeEngine) CancelSeekYTDL()                         {}
-func (f *playbackFakeEngine) IsPlaying() bool                         { return f.playing }
-func (f *playbackFakeEngine) IsPaused() bool                          { return false }
-func (f *playbackFakeEngine) Drained() bool                           { return false }
-func (f *playbackFakeEngine) HasPreload() bool                        { return false }
-func (f *playbackFakeEngine) Seekable() bool                          { return false }
-func (f *playbackFakeEngine) IsStreamSeek() bool                      { return false }
-func (f *playbackFakeEngine) IsYTDLSeek() bool                        { return false }
-func (f *playbackFakeEngine) GaplessAdvanced() bool                   { return false }
-func (f *playbackFakeEngine) Position() time.Duration                 { return 0 }
-func (f *playbackFakeEngine) Duration() time.Duration                 { return 0 }
+func (f *playbackFakeEngine) PreloadYTDL(path string, _ time.Duration) error {
+	f.preloadPaths = append(f.preloadPaths, path)
+	return nil
+}
+func (f *playbackFakeEngine) ClearPreload()                { f.clearPreloadCalls++ }
+func (f *playbackFakeEngine) Stop()                        { f.playing = false }
+func (f *playbackFakeEngine) Close()                       {}
+func (f *playbackFakeEngine) TogglePause()                 {}
+func (f *playbackFakeEngine) Seek(time.Duration) error     { return nil }
+func (f *playbackFakeEngine) SeekYTDL(time.Duration) error { return nil }
+func (f *playbackFakeEngine) CancelSeekYTDL()              {}
+func (f *playbackFakeEngine) IsPlaying() bool              { return f.playing }
+func (f *playbackFakeEngine) IsPaused() bool               { return false }
+func (f *playbackFakeEngine) Drained() bool                { return false }
+func (f *playbackFakeEngine) HasPreload() bool             { return false }
+func (f *playbackFakeEngine) Seekable() bool               { return false }
+func (f *playbackFakeEngine) IsStreamSeek() bool           { return false }
+func (f *playbackFakeEngine) IsYTDLSeek() bool             { return false }
+func (f *playbackFakeEngine) GaplessAdvanced() bool        { return false }
+func (f *playbackFakeEngine) Position() time.Duration      { return 0 }
+func (f *playbackFakeEngine) Duration() time.Duration      { return 0 }
 func (f *playbackFakeEngine) PositionAndDuration() (time.Duration, time.Duration) {
 	return 0, 0
 }
@@ -125,8 +132,8 @@ func TestTogglePlayPauseRestartsQueuedCurrentTrack(t *testing.T) {
 		_ = cmd()
 	}
 
-	if len(player.playCalls) != 1 || player.playCalls[0] != "queued.mp3" {
-		t.Fatalf("playCalls = %v, want [queued.mp3]", player.playCalls)
+	if len(player.playPaths) != 1 || player.playPaths[0] != "queued.mp3" {
+		t.Fatalf("playPaths = %v, want [queued.mp3]", player.playPaths)
 	}
 	if current, idx := m.playlist.Current(); current.Title != "Queued" || idx != 1 {
 		t.Fatalf("current = (%q,%d), want (\"Queued\",1)", current.Title, idx)
@@ -186,8 +193,8 @@ func TestPlayCurrentTrackUnplayableStopsWhenNoReplacementExists(t *testing.T) {
 	if cmd := m.playCurrentTrack(); cmd != nil {
 		t.Fatalf("playCurrentTrack() = %v, want nil", cmd)
 	}
-	if len(player.playCalls) != 0 {
-		t.Fatalf("playCalls = %v, want none", player.playCalls)
+	if len(player.playPaths) != 0 {
+		t.Fatalf("playPaths = %v, want none", player.playPaths)
 	}
 	if player.IsPlaying() {
 		t.Fatal("player.IsPlaying() = true, want false")
@@ -255,8 +262,8 @@ func TestNextAfterProviderPlaylistLoadStartsFirstNewTrack(t *testing.T) {
 		_ = cmd()
 	}
 
-	if len(player.playCalls) == 0 || player.playCalls[0] != "new1.mp3" {
-		t.Fatalf("playCalls = %v, want first new track", player.playCalls)
+	if len(player.playPaths) == 0 || player.playPaths[0] != "new1.mp3" {
+		t.Fatalf("playPaths = %v, want first new track", player.playPaths)
 	}
 	if m.playbackDetached {
 		t.Fatal("playbackDetached = true, want false")
@@ -276,7 +283,168 @@ func TestPreloadAfterProviderPlaylistLoadUsesFirstNewTrack(t *testing.T) {
 	}
 	_ = cmd()
 
-	if len(player.preloadCalls) != 1 || player.preloadCalls[0] != "new1.mp3" {
-		t.Fatalf("preloadCalls = %v, want first new track", player.preloadCalls)
+	if len(player.preloadPaths) != 1 || player.preloadPaths[0] != "new1.mp3" {
+		t.Fatalf("preloadPaths = %v, want first new track", player.preloadPaths)
+	}
+}
+
+func TestOfflinePreloadSkipsRemoteNextTracks(t *testing.T) {
+	tests := []playlist.Track{
+		{Title: "HTTP Stream", Path: "https://example.com/stream.mp3", Stream: true},
+		{Title: "YT Search", Path: "ytsearch1:lofi"},
+		{Title: "Spotify", Path: "spotify:track:abc"},
+	}
+
+	for _, next := range tests {
+		t.Run(next.Title, func(t *testing.T) {
+			player := &playbackFakeEngine{playing: true}
+			p := playlist.New()
+			p.Replace([]playlist.Track{
+				{Title: "Now", Path: "now.mp3", DurationSecs: 180},
+				next,
+			})
+			p.SetIndex(0)
+			m := Model{
+				player:   player,
+				playlist: p,
+				vis:      ui.NewVisualizer(float64(player.SampleRate())),
+				offline:  true,
+			}
+
+			if cmd := m.preloadNext(); cmd != nil {
+				_ = cmd()
+				t.Fatalf("preloadNext() returned command in offline mode for %q", next.Path)
+			}
+			if len(player.preloadPaths) != 0 {
+				t.Fatalf("preloadPaths = %v, want none", player.preloadPaths)
+			}
+		})
+	}
+}
+
+func TestOfflineProviderPlaylistLoadRejectsRemoteTrack(t *testing.T) {
+	player := &playbackFakeEngine{}
+	p := playlist.New()
+	p.Replace([]playlist.Track{{Title: "Existing", Path: "existing.mp3"}})
+	m := Model{
+		player:      player,
+		playlist:    p,
+		vis:         ui.NewVisualizer(float64(player.SampleRate())),
+		offline:     true,
+		provLoading: true,
+	}
+
+	updated, _ := m.Update(tracksLoadedMsg{
+		{Title: "Remote", Path: "https://example.com/stream.mp3", Stream: true},
+	})
+	m = updated.(Model)
+
+	tracks := m.playlist.Tracks()
+	if len(tracks) != 1 || tracks[0].Path != "existing.mp3" {
+		t.Fatalf("playlist tracks = %#v, want existing local playlist unchanged", tracks)
+	}
+	if m.provLoading {
+		t.Fatal("provLoading = true, want false")
+	}
+	if !strings.Contains(m.status.text, "Offline mode: remote track") {
+		t.Fatalf("status.text = %q, want offline rejection", m.status.text)
+	}
+	if player.clearPreloadCalls != 0 {
+		t.Fatalf("ClearPreload calls = %d, want 0", player.clearPreloadCalls)
+	}
+}
+
+func TestOfflineFileBrowserRejectsRemoteTracks(t *testing.T) {
+	player := &playbackFakeEngine{}
+	p := playlist.New()
+	m := Model{
+		player:   player,
+		playlist: p,
+		vis:      ui.NewVisualizer(float64(player.SampleRate())),
+		offline:  true,
+	}
+
+	updated, _ := m.Update(fbTracksResolvedMsg{
+		tracks: []playlist.Track{{Title: "Remote", Path: "https://example.com/stream.mp3", Stream: true}},
+	})
+	m = updated.(Model)
+
+	if m.playlist.Len() != 0 {
+		t.Fatalf("playlist.Len() = %d, want 0", m.playlist.Len())
+	}
+	if !strings.Contains(m.status.text, "Offline mode: remote track") {
+		t.Fatalf("status.text = %q, want offline rejection", m.status.text)
+	}
+}
+
+func TestOfflinePlaylistManagerPlayRejectsRemoteTracks(t *testing.T) {
+	player := &playbackFakeEngine{}
+	p := playlist.New()
+	p.Replace([]playlist.Track{{Title: "Existing", Path: "existing.mp3"}})
+	m := Model{
+		player:   player,
+		playlist: p,
+		vis:      ui.NewVisualizer(float64(player.SampleRate())),
+		offline:  true,
+		plManager: plManagerState{
+			selPlaylist: "mixed",
+			tracks: []playlist.Track{
+				{Title: "Remote", Path: "https://example.com/stream.mp3", Stream: true},
+			},
+		},
+	}
+
+	if cmd := m.plMgrLoadAndPlay(0); cmd != nil {
+		t.Fatalf("plMgrLoadAndPlay() = %v, want nil", cmd)
+	}
+	tracks := m.playlist.Tracks()
+	if len(tracks) != 1 || tracks[0].Path != "existing.mp3" {
+		t.Fatalf("playlist tracks = %#v, want existing local playlist unchanged", tracks)
+	}
+	if len(player.playPaths) != 0 {
+		t.Fatalf("playPaths = %v, want none", player.playPaths)
+	}
+	if !strings.Contains(m.status.text, "Offline mode: remote track") {
+		t.Fatalf("status.text = %q, want offline rejection", m.status.text)
+	}
+}
+
+func TestOfflineDirectTrackActionsRejectRemoteTracks(t *testing.T) {
+	remote := playlist.Track{Title: "Remote", Path: "https://example.com/stream.mp3", Stream: true}
+	tests := []struct {
+		name string
+		run  func(*Model) tea.Cmd
+	}{
+		{"play immediate", func(m *Model) tea.Cmd { return m.playTrackImmediate(remote) }},
+		{"append", func(m *Model) tea.Cmd { return m.appendTrack(remote) }},
+		{"queue next", func(m *Model) tea.Cmd { return m.queueTrackNext(remote) }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			player := &playbackFakeEngine{}
+			p := playlist.New()
+			p.Replace([]playlist.Track{{Title: "Existing", Path: "existing.mp3"}})
+			m := Model{
+				player:   player,
+				playlist: p,
+				vis:      ui.NewVisualizer(float64(player.SampleRate())),
+				offline:  true,
+			}
+
+			if cmd := tt.run(&m); cmd != nil {
+				t.Fatalf("%s returned command in offline mode", tt.name)
+			}
+			tracks := m.playlist.Tracks()
+			if len(tracks) != 1 || tracks[0].Path != "existing.mp3" {
+				t.Fatalf("playlist tracks = %#v, want existing local playlist unchanged", tracks)
+			}
+			if len(player.playPaths) != 0 {
+				t.Fatalf("playPaths = %v, want none", player.playPaths)
+			}
+			if !strings.Contains(m.status.text, "Offline mode: remote track") {
+				t.Fatalf("status.text = %q, want offline rejection", m.status.text)
+			}
+		})
 	}
 }

@@ -238,7 +238,7 @@ func run(overrides config.Overrides, positional []string, daemon bool) error {
 	}
 	pl.Add(resolved.Tracks...)
 	if cfg.Offline {
-		if path := firstRemoteTrackPath(pl.Tracks()); path != "" {
+		if path := playlist.FirstRemotePlaybackPath(pl.Tracks()); path != "" {
 			return fmt.Errorf("offline mode: remote track %q is disabled", path)
 		}
 	}
@@ -521,27 +521,11 @@ func wireMediaCtl(prog *tea.Program) (*mediactl.Service, error) {
 
 func hasRemoteInputs(args []string) bool {
 	for _, arg := range args {
-		if isRemoteTrackPath(arg) {
+		if playlist.IsRemotePlaybackPath(arg) {
 			return true
 		}
 	}
 	return false
-}
-
-func firstRemoteTrackPath(tracks []playlist.Track) string {
-	for _, track := range tracks {
-		if track.Stream || track.Feed || isRemoteTrackPath(track.Path) {
-			return track.Path
-		}
-	}
-	return ""
-}
-
-func isRemoteTrackPath(path string) bool {
-	return playlist.IsURL(path) ||
-		playlist.IsYTDL(path) ||
-		strings.HasPrefix(path, "spotify:") ||
-		strings.HasPrefix(path, "ssh://")
 }
 
 func ipcSend(req ipc.Request) (ipc.Response, error) {

@@ -1850,6 +1850,9 @@ func (m *Model) handlePlMgrTracksKey(msg tea.KeyPressMsg) tea.Cmd {
 // plMgrLoadAndPlay replaces the live playlist with the manager's tracks and
 // starts playback at startIdx.
 func (m *Model) plMgrLoadAndPlay(startIdx int) tea.Cmd {
+	if m.rejectOfflineRemoteTracks(m.plManager.tracks) {
+		return nil
+	}
 	m.player.Stop()
 	m.player.ClearPreload()
 	m.resetYTDLBatch()
